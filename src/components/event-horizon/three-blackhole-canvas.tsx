@@ -98,7 +98,9 @@ uniform sampler2D u_starfieldTexture; // Texture of the rendered starfield
 uniform vec2 u_resolution;           // Screen resolution for aspect ratio
 uniform float u_lensingStrength;     // Strength of the lensing effect
 uniform mat4 u_bhModelMatrix;       // Black hole's model matrix (world transform)
-// Note: viewMatrix and projectionMatrix are built-in uniforms in Three.js shaders
+uniform mat4 projectionMatrix;      // Three.js built-in
+uniform mat4 viewMatrix;            // Three.js built-in
+
 
 float simpleNoise(vec2 st) {
     return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
