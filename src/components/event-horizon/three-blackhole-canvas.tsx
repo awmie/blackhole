@@ -474,17 +474,28 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 
       const planetMeshes = planetMeshesRef.current;
-      spawnedPlanetsRef.current.forEach(planet => {
+      // Create a mutable copy of planet states for this frame if direct modifications are needed
+      // However, it's better to update state via callbacks to page.tsx for orbitRadius, isStretching, etc.
+      // For this fix, we focus on reading props and applying scale correctly.
+      
+      spawnedPlanetsRef.current.forEach(planet => { // planet is from props, treat as read-only for its state fields
         const mesh = planetMeshes.get(planet.id);
         if (!mesh) return;
 
-        planet.currentAngle += planet.angularVelocity * deltaTime;
-        planet.timeToLive -= deltaTime;
-        
-        let currentOrbitRadius = planet.orbitRadius;
-        const blackHoleActualRadius = blackHoleRadius;
-        const distanceToCenterSq = mesh.position.lengthSq();
+        // We need a mutable copy of orbitRadius for this frame's simulation step
+        let currentPlanetOrbitRadius = planet.orbitRadius;
+        let currentPlanetAngle = planet.currentAngle + planet.angularVelocity * deltaTime;
+        let currentPlanetTimeToLive = planet.timeToLive - deltaTime;
 
+        // Update page.tsx state via callbacks ideally, e.g.,
+        // onUpdatePlanetOrbitRef.current(planet.id, newRadius);
+        // onUpdatePlanetAngleRef.current(planet.id, newAngle);
+        // onUpdatePlanetTTLRef.current(planet.id, newTTL);
+        // For now, we'll update local copies and use them for positioning,
+        // but page.tsx won't know about these interim changes until a major event like absorption.
+
+        const blackHoleActualRadius = blackHoleRadius;
+        const distanceToCenterSq = mesh.position.lengthSq(); // Based on PREVIOUS frame's position
 
         if (planet.isDissolving) {
             let progress = dissolvingObjectsProgressRef.current.get(planet.id) || 0;
@@ -499,37 +510,25 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 planet.initialScale.z * scaleFactor
             );
             
-            currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (0.5 + progress * 1.5);
-            planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleActualRadius * 0.1);
+            currentPlanetOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (0.5 + progress * 1.5);
+            currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.1);
 
             if (progress >= 1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
             }
-        } else {
+        } else { // Not dissolving
             if (distanceToCenterSq < Math.pow(blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR, 2)) {
                 if (onSetPlanetDissolvingRef.current) onSetPlanetDissolvingRef.current(planet.id, true);
-            } else if (mesh.position.length() < blackHoleActualRadius * 0.9 || planet.timeToLive <= 0) {
+            } else if (mesh.position.length() < blackHoleActualRadius * 0.9 || currentPlanetTimeToLive <= 0) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
             } else {
-                if (!planet.isStretching && distanceToCenterSq < Math.pow(blackHoleActualRadius * 1.5, 2)) { 
-                    planet.isStretching = true;
-                    const radialDir = mesh.position.clone().normalize();
-                    planet.stretchAxis = {x: radialDir.x, y: radialDir.y, z: radialDir.z };
-                } else if (planet.isStretching && distanceToCenterSq >= Math.pow(blackHoleActualRadius * 1.5, 2)) {
-                    planet.isStretching = false; 
-                }
-
-                if (planet.isStretching || planet.timeToLive < 10) { 
-                    currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, planet.timeToLive)) * 0.2; 
-                    planet.orbitRadius = currentOrbitRadius;
-                }
-
-                if (planet.isStretching) { 
-                                        
+                // Still orbiting, not dissolving, not being immediately absorbed.
+                // Scaling and pull-in logic:
+                if (planet.isStretching) { // Read from PlanetState prop
                     const stretchFactor = Math.min(5, 1 + (Math.pow(blackHoleActualRadius,2) / Math.max(distanceToCenterSq, 0.01)) * 2); 
                     const squashFactor = 1 / Math.sqrt(stretchFactor); 
 
-                    let targetDir = mesh.position.clone().normalize().multiplyScalar(-1);
+                    let targetDir = mesh.position.clone().normalize();
                     const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetDir); 
                     mesh.quaternion.slerp(quaternion, 0.1); 
                     
@@ -538,17 +537,30 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         planet.initialScale.y * squashFactor,
                         planet.initialScale.z * stretchFactor 
                     );
-
+                    // Gentle pull-in for stretching objects
+                    currentPlanetOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, currentPlanetTimeToLive)) * 0.2;
                 } else { 
+                    // NOT DISSOLVING and NOT STRETCHING: Reset to initial scale
                     mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
-                    mesh.quaternion.slerp(new THREE.Quaternion(), 0.1); 
+                    mesh.quaternion.slerp(new THREE.Quaternion(), 0.1); // Reset rotation
+                    // Gentle pull-in only if TTL is low
+                    if (currentPlanetTimeToLive < 10) {
+                         currentPlanetOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, currentPlanetTimeToLive)) * 0.05; // Reduced further
+                    }
                 }
+                currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.5); // Prevent going too deep unless dissolving
             }
         }
-
-        const x = planet.orbitRadius * Math.cos(planet.currentAngle);
-        const z = planet.orbitRadius * Math.sin(planet.currentAngle);
+        
+        // Position update (using potentially modified currentPlanetOrbitRadius)
+        const x = currentPlanetOrbitRadius * Math.cos(currentPlanetAngle);
+        const z = currentPlanetOrbitRadius * Math.sin(currentPlanetAngle);
         mesh.position.set(x, planet.yOffset, z);
+
+        // To properly update page.tsx, you'd call callbacks here:
+        // onUpdatePlanetStateRef.current(planet.id, { orbitRadius: currentPlanetOrbitRadius, currentAngle: currentPlanetAngle, timeToLive: currentPlanetTimeToLive });
+        // Without this, page.tsx's PlanetState for these values will be stale until a major event.
+        // This local simulation of orbitRadius, angle, TTL is a temporary workaround.
       });
 
 
@@ -635,7 +647,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       if (jetParticlesRef.current) {
         scene.remove(jetParticlesRef.current);
         jetParticlesRef.current.geometry.dispose();
-        if (jetParticlesRef.current.material) { // Check if material exists
+        if (jetParticlesRef.current.material) { 
             (jetParticlesRef.current.material as THREE.Material).dispose();
         }
       }
@@ -733,11 +745,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             }
           }
           
-          if (!planet.isDissolving) {
-             let progress = dissolvingObjectsProgressRef.current.get(planet.id);
-             if (progress === undefined && !planet.isStretching) { 
-                mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
-             }
+          // Reset scale based on props if not dissolving and not stretching (as per page.tsx state)
+          // This reinforces that page.tsx is the source of truth for these states.
+          if (!planet.isDissolving && !planet.isStretching) {
+             mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
           }
         }
       }
@@ -762,6 +773,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
-
-
     
