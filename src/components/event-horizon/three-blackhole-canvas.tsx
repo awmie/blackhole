@@ -506,52 +506,42 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
             }
         } else {
-            // Not dissolving: check for starting dissolution, direct absorption, gentle pull-in, or stretching
             if (distanceToCenterSq < Math.pow(blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR, 2)) {
                 if (onSetPlanetDissolvingRef.current) onSetPlanetDissolvingRef.current(planet.id, true);
             } else if (mesh.position.length() < blackHoleActualRadius * 0.9 || planet.timeToLive <= 0) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
             } else {
-                 // Stretching logic (only if not dissolving)
                 if (!planet.isStretching && distanceToCenterSq < Math.pow(blackHoleActualRadius * 1.5, 2)) { 
                     planet.isStretching = true;
                     const radialDir = mesh.position.clone().normalize();
                     planet.stretchAxis = {x: radialDir.x, y: radialDir.y, z: radialDir.z };
                 } else if (planet.isStretching && distanceToCenterSq >= Math.pow(blackHoleActualRadius * 1.5, 2)) {
-                    planet.isStretching = false; // Reset if it moves out of stretching radius
+                    planet.isStretching = false; 
                 }
 
-                // Gentle pull-in if stretching or timeToLive is low (and not dissolving)
                 if (planet.isStretching || planet.timeToLive < 10) { 
-                    currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, planet.timeToLive)) * 0.2; // Reduced gentle pull
+                    currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, planet.timeToLive)) * 0.2; 
                     planet.orbitRadius = currentOrbitRadius;
                 }
 
-                // Apply scale and rotation based on state
                 if (planet.isStretching) { 
-                    const baseScaleX = planet.initialScale.x;
-                    const baseScaleY = planet.initialScale.y;
-                    const baseScaleZ = planet.initialScale.z;
-                    
+                                        
                     const stretchFactor = Math.min(5, 1 + (Math.pow(blackHoleActualRadius,2) / Math.max(distanceToCenterSq, 0.01)) * 2); 
                     const squashFactor = 1 / Math.sqrt(stretchFactor); 
 
-                    mesh.scale.set(
-                        baseScaleX * squashFactor,
-                        baseScaleY * squashFactor,
-                        baseScaleZ * squashFactor 
-                    );
-                    
-                    // Align object towards the black hole (origin)
                     let targetDir = mesh.position.clone().normalize().multiplyScalar(-1);
                     const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetDir); 
                     mesh.quaternion.slerp(quaternion, 0.1); 
-                    mesh.scale.z *= stretchFactor; // Assuming Z is the elongated axis after rotation
+                    
+                    mesh.scale.set(
+                        planet.initialScale.x * squashFactor,
+                        planet.initialScale.y * squashFactor,
+                        planet.initialScale.z * stretchFactor 
+                    );
 
                 } else { 
-                    // Not stretching, not dissolving: Reset to initial scale and default rotation
                     mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
-                    mesh.quaternion.slerp(new THREE.Quaternion(), 0.1); // Reset to default identity quaternion
+                    mesh.quaternion.slerp(new THREE.Quaternion(), 0.1); 
                 }
             }
         }
@@ -645,7 +635,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       if (jetParticlesRef.current) {
         scene.remove(jetParticlesRef.current);
         jetParticlesRef.current.geometry.dispose();
-        (jetParticlesRef.current.material as THREE.Material).dispose();
+        if (jetParticlesRef.current.material) { // Check if material exists
+            (jetParticlesRef.current.material as THREE.Material).dispose();
+        }
       }
 
       sceneRef.current?.traverse(object => {
@@ -770,3 +762,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
+
+
+    
