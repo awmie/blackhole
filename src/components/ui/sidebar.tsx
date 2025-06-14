@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -7,7 +8,7 @@ import { PanelLeft } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { Button, type ButtonProps } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -259,30 +260,56 @@ const Sidebar = React.forwardRef<
 )
 Sidebar.displayName = "Sidebar"
 
+interface SidebarTriggerProps extends ButtonProps {
+  // No need to redeclare asChild, it's part of ButtonProps
+}
+
 const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
-  React.ComponentProps<typeof Button>
->(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar()
+  SidebarTriggerProps
+>(({ className, onClick, asChild = false, children, ...props }, ref) => {
+  const { toggleSidebar } = useSidebar();
 
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    // If the original onClick prop exists (from the component using SidebarTrigger, or its child if asChild), call it.
+    if (onClick) {
+      onClick(event);
+    }
+    toggleSidebar();
+  };
+
+  if (asChild && React.isValidElement(children)) {
+    // If asChild is true, use Slot to wrap the single child.
+    // Props like className, variant, size, and the merged onClick are passed to Slot,
+    // which then forwards them to the actual child element.
+    return (
+      <Slot
+        ref={ref as React.Ref<any>} // Slot can take a generic ref
+        onClick={handleClick}
+        className={cn("h-7 w-7", className)} // Apply default and passed className
+        {...props} // Spread other props (variant, size from usage if any)
+      >
+        {children}
+      </Slot>
+    );
+  }
+
+  // If not asChild, render the default Button with PanelLeft icon.
   return (
     <Button
       ref={ref}
       data-sidebar="trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("h-7 w-7", className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
+      variant="ghost" // Default variant
+      size="icon"    // Default size
+      className={cn("h-7 w-7", className)} // Apply default and passed className
+      onClick={handleClick}
+      {...props} // Spread other props (e.g., specific variant/size if user overrides defaults for non-asChild version)
     >
       <PanelLeft />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
-  )
-})
+  );
+});
 SidebarTrigger.displayName = "SidebarTrigger"
 
 const SidebarRail = React.forwardRef<
