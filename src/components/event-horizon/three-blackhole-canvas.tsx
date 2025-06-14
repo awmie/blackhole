@@ -52,11 +52,10 @@ float simpleNoise(vec2 st) {
 float fbm(vec2 st) {
     float value = 0.0;
     float amplitude = 0.5;
-    // frequency can be left out or initialized if used, but not strictly needed for this fbm
-    for (int i = 0; i < 4; i++) { // 4 octaves
+    for (int i = 0; i < 5; i++) { // More octaves for more detail
         value += amplitude * simpleNoise(st);
-        st *= 2.0; // Double the frequency
-        amplitude *= 0.5; // Halve the amplitude
+        st *= 2.1; // Slightly increased frequency multiplier
+        amplitude *= 0.45; // Slightly faster amplitude decay
     }
     return value;
 }
@@ -67,27 +66,33 @@ void main() {
 
   // Fresnel effect: stronger at glancing angles (edges of the sphere)
   // Increased power for sharper edge, and overall intensity boost
-  float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 5.0) * 1.5; 
+  float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 6.0) * 2.5; // Sharper and more intense
   fresnel = clamp(fresnel, 0.0, 1.0);
 
   // Animated procedural noise for distortion/swirl effect
-  vec2 noiseCoordBase = v_worldPosition.xz * 0.8 + u_time * 0.05; // Swirl on XZ plane
-  noiseCoordBase.x += sin(v_worldPosition.y * 5.0 + u_time * 0.1) * 0.2; // Add some vertical waviness
+  vec2 noiseCoordBase1 = v_worldPosition.xz * 1.0 + u_time * 0.06;
+  noiseCoordBase1.x += sin(v_worldPosition.y * 10.0 + u_time * 0.15) * 0.25; // More y-influence
+  
+  vec2 noiseCoordBase2 = v_worldPosition.yx * 1.2 - u_time * 0.04; // Different plane, different speed/direction
+  noiseCoordBase2.y += cos(v_worldPosition.z * 8.0 - u_time * 0.12) * 0.2;
 
-  float noiseVal = fbm(noiseCoordBase); // Use fractional Brownian motion for more detail
-  noiseVal = smoothstep(0.3, 0.7, noiseVal); // Adjust smoothing
+  float noiseVal1 = fbm(noiseCoordBase1);
+  float noiseVal2 = fbm(noiseCoordBase2 * 1.5); // Second layer with different scale
+
+  float combinedNoise = noiseVal1 * 0.6 + noiseVal2 * 0.4; // Blend noises
+  combinedNoise = smoothstep(0.35, 0.65, combinedNoise); // Adjust smoothing for sharper details
 
   // Base color is black
   vec3 color = vec3(0.0, 0.0, 0.0);
 
   // Lensed light color - bright, inspired by inner accretion disk
-  vec3 lensedLightColor = vec3(1.0, 0.7, 0.9); // Bright pinkish-white
+  vec3 lensedLightColor = vec3(1.0, 0.75, 0.95); // Slightly adjusted for more pop
 
   // Mix the black color with the lensed light color based on fresnel and noise
-  // Increased intensity of the effect
-  float effectIntensity = fresnel * noiseVal * 1.5; // Increased base intensity
+  // Increased intensity of the effect, allow it to go to full white at edges
+  float effectIntensity = fresnel * combinedNoise * 2.0; // Further increased base intensity
   
-  color = mix(color, lensedLightColor, clamp(effectIntensity, 0.0, 0.85)); // Clamp to allow strong glow
+  color = mix(color, lensedLightColor, clamp(effectIntensity, 0.0, 1.0)); // Allow full saturation to white
 
   gl_FragColor = vec4(color, 1.0);
 }
@@ -148,17 +153,17 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       const i4 = i * 4; 
       const radius = Math.random() * (outerR - innerR) + innerR;
       const angle = Math.random() * Math.PI * 2;
-      const yOffset = (Math.random() - 0.5) * 0.15;
+      const yOffset = (Math.random() - 0.5) * 0.15; // Kept disk thinner
 
       let normalizedDist = (radius - innerR) / (outerR - innerR);
       normalizedDist = Math.max(0, Math.min(1, normalizedDist));
 
-      const keplerianFactor = Math.pow(innerR / radius, 2.0); // More aggressive speed increase closer in
+      const keplerianFactor = Math.pow(innerR / radius, 2.0); 
       let angularVelocity = baseAngularSpeed * keplerianFactor;
 
       const photonRingThreshold = 0.03;
       if (normalizedDist < photonRingThreshold) {
-        angularVelocity *= 5.0; // Further accelerate particles in the "photon ring"
+        angularVelocity *= 5.0; 
       }
       
       angularVelocity = Math.max(angularVelocity, baseAngularSpeed * minAngularSpeedFactor);
@@ -240,7 +245,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       0.1,
       1000
     );
-    camera.position.set(0, blackHoleRadius * 1.5, blackHoleRadius * 4); // Adjusted camera position
+    camera.position.set(0, blackHoleRadius * 1.5, blackHoleRadius * 4); 
     cameraRef.current = camera;
     onCameraUpdate({ x: camera.position.x, y: camera.position.y, z: camera.position.z });
 
@@ -254,7 +259,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
-    controls.minDistance = blackHoleRadius * 1.2; // Closer min distance
+    controls.minDistance = blackHoleRadius * 1.2; 
     controls.maxDistance = 500;
     controlsRef.current = controls;
     
@@ -264,17 +269,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       }
     });
 
-    // No ambient or point light needed as shader handles illumination/emission
-    // const ambientLight = new THREE.AmbientLight(0xffffff, 0.1); 
-    // scene.add(ambientLight);
-
     const blackHoleGeometry = new THREE.SphereGeometry(blackHoleRadius, 64, 64);
     const blackHoleMaterial = new THREE.ShaderMaterial({
       vertexShader: blackHoleVertexShader,
       fragmentShader: blackHoleFragmentShader,
       uniforms: {
         u_time: { value: 0.0 },
-        // cameraPosition is usually provided by Three.js automatically
       },
       transparent: false, 
     });
@@ -286,7 +286,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     
     const starsGeometry = new THREE.BufferGeometry();
     const starVertices = [];
-    for (let i = 0; i < 75000; i++) { // Increased star count
+    for (let i = 0; i < 75000; i++) { 
         const r = 150 + Math.random() * 500; 
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
@@ -322,7 +322,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
           const i3 = i * 3;
           positions[i3] = pData.radius * Math.cos(pData.angle);
-          // positions[i3 + 1] stays pData.yOffset
           positions[i3 + 2] = pData.radius * Math.sin(pData.angle);
         }
         accretionDiskRef.current.geometry.attributes.position.needsUpdate = true;
