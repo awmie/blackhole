@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -6,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sun, PanelLeftClose, PanelRightClose, Layers, Ruler, Move3d, Database } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Sun, PanelLeftClose, PanelRightClose, Layers, Ruler, Move3d, Database, Atom, Sparkles } from 'lucide-react';
 
 interface ControlPanelProps {
   blackHoleRadius: number;
@@ -18,6 +20,7 @@ interface ControlPanelProps {
   accretionDiskOpacity: number;
   setAccretionDiskOpacity: (value: number) => void;
   cameraPosition: { x: number; y: number; z: number };
+  onSpawnPlanetClick: () => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -30,6 +33,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   accretionDiskOpacity,
   setAccretionDiskOpacity,
   cameraPosition,
+  onSpawnPlanetClick,
 }) => {
   const calculatedSchwarzschildRadius = (blackHoleRadius * 0.25).toFixed(2); // Example calculation
 
@@ -38,7 +42,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       <div className="p-4 space-y-6">
         <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl font-headline flex items-center"><Sun className="mr-2 h-6 w-6 text-sidebar-primary" /> Black Hole Settings</CardTitle>
+            <CardTitle className="text-xl font-headline flex items-center"><Sun className="mr-2 h-6 w-6 text-sidebar-primary" /> Black Hole</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
@@ -60,7 +64,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
         <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl font-headline flex items-center"><Layers className="mr-2 h-6 w-6 text-sidebar-primary" /> Accretion Disk Settings</CardTitle>
+            <CardTitle className="text-xl font-headline flex items-center"><Layers className="mr-2 h-6 w-6 text-sidebar-primary" /> Accretion Disk</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
@@ -69,7 +73,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </Label>
               <Slider
                 id="accretionDiskInnerRadius"
-                min={blackHoleRadius + 0.1} // Ensure inner radius is outside black hole
+                min={blackHoleRadius + 0.1} 
                 max={10}
                 step={0.1}
                 value={[accretionDiskInnerRadius]}
@@ -83,7 +87,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </Label>
               <Slider
                 id="accretionDiskOuterRadius"
-                min={accretionDiskInnerRadius + 0.2} // Ensure outer radius is larger than inner
+                min={accretionDiskInnerRadius + 0.2} 
                 max={20}
                 step={0.1}
                 value={[accretionDiskOuterRadius]}
@@ -108,6 +112,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </CardContent>
         </Card>
         
+        <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl font-headline flex items-center"><Atom className="mr-2 h-6 w-6 text-sidebar-primary" /> Object Controls</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button onClick={onSpawnPlanetClick} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Atom className="mr-2 h-4 w-4" /> Spawn Planet
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">Planets will orbit and may get absorbed. After 3 absorptions, Hawking radiation jets might appear briefly.</p>
+          </CardContent>
+        </Card>
+
         <Separator className="my-6 bg-sidebar-border" />
 
         <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">

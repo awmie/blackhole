@@ -1,23 +1,16 @@
 
 "use client";
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { SidebarProvider, Sidebar, SidebarInset, SidebarHeader, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Info, Atom, Sparkles } from 'lucide-react';
+import type { PlanetState, JetParticleState } from '@/components/event-horizon/three-blackhole-canvas'; // Assuming types are exported
 
 // Dynamically import ThreeBlackholeCanvas to ensure it's client-side only
 const ThreeBlackholeCanvas = React.lazy(() => import('@/components/event-horizon/three-blackhole-canvas'));
-
-// Skeleton loader for ControlPanel
-const ControlPanelSkeleton = () => (
-  <div className="p-4 space-y-6">
-    <Skeleton className="h-36 w-full rounded-lg bg-sidebar-accent/30" />
-    <Skeleton className="h-52 w-full rounded-lg bg-sidebar-accent/30" />
-    <Skeleton className="h-24 w-full rounded-lg bg-sidebar-accent/30" />
-  </div>
-);
 
 // Dynamically import ControlPanel with SSR disabled
 const ControlPanel = dynamic(() => import('@/components/event-horizon/control-panel'), {
@@ -25,6 +18,17 @@ const ControlPanel = dynamic(() => import('@/components/event-horizon/control-pa
   loading: () => <ControlPanelSkeleton />,
 });
 
+const ControlPanelSkeleton = () => (
+  <div className="p-4 space-y-6">
+    <Skeleton className="h-36 w-full rounded-lg bg-sidebar-accent/30" />
+    <Skeleton className="h-52 w-full rounded-lg bg-sidebar-accent/30" />
+    <Skeleton className="h-24 w-full rounded-lg bg-sidebar-accent/30" />
+    <Skeleton className="h-20 w-full rounded-lg bg-sidebar-accent/30" />
+  </div>
+);
+
+const HAWKING_RADIATION_THRESHOLD = 3; // Number of absorptions to trigger jets
+const HAWKING_RADIATION_DURATION = 5000; // 5 seconds
 
 export default function Home() {
   const [blackHoleRadius, setBlackHoleRadius] = useState(1);
@@ -33,17 +37,24 @@ export default function Home() {
   const [accretionDiskOpacity, setAccretionDiskOpacity] = useState(0.8);
   const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 2, z: 5 });
 
-  const handleCameraUpdate = (position: { x: number; y: number; z: number }) => {
-    setCameraPosition(position);
-  };
+  const [spawnedPlanets, setSpawnedPlanets] = useState<PlanetState[]>([]);
+  const [nextPlanetId, setNextPlanetId] = useState(0);
+  const [absorbedPlanetCount, setAbsorbedPlanetCount] = useState(0);
+  const [isEmittingJets, setIsEmittingJets] = useState(false);
+  const [showControlsPanel, setShowControlsPanel] = useState(true);
 
-  // Ensure inner radius is always > blackHoleRadius and outer > inner
+
+  const handleCameraUpdate = useCallback((position: { x: number; y: number; z: number }) => {
+    setCameraPosition(position);
+  }, []);
+
   const handleBlackHoleRadiusChange = (value: number) => {
     setBlackHoleRadius(value);
     if (accretionDiskInnerRadius <= value) {
-      setAccretionDiskInnerRadius(value + 0.1);
-      if (accretionDiskOuterRadius <= value + 0.1) {
-        setAccretionDiskOuterRadius(value + 0.3);
+      const newInner = value + 0.1;
+      setAccretionDiskInnerRadius(newInner);
+      if (accretionDiskOuterRadius <= newInner) {
+        setAccretionDiskOuterRadius(newInner + 0.2);
       }
     }
   };
@@ -63,51 +74,93 @@ export default function Home() {
     }
   };
 
+  const handleSpawnPlanet = useCallback(() => {
+    const id = nextPlanetId;
+    setNextPlanetId(prev => prev + 1);
+    
+    const orbitRadius = accretionDiskOuterRadius * (0.8 + Math.random() * 0.4); // Spawn near outer edge, slightly randomized
+    const angle = Math.random() * Math.PI * 2;
+    const yOffset = (Math.random() - 0.5) * 0.1; // Slight vertical variation
+    
+    // Simplified angular velocity - make it orbit roughly with outer disk particles
+    const baseSpeed = 1.0; // Matches baseAngularSpeed in canvas
+    const minSpeedFactor = 0.02; // Matches minAngularSpeedFactor
+    let angularVelocity = baseSpeed * Math.pow(accretionDiskInnerRadius / orbitRadius, 2.5);
+    angularVelocity = Math.max(angularVelocity, baseSpeed * minSpeedFactor) * (Math.random() > 0.5 ? 1 : -1); // Random direction
+
+    const newPlanet: PlanetState = {
+      id,
+      orbitRadius,
+      currentAngle: angle,
+      angularVelocity: angularVelocity * 0.5, // Slower than disk particles initially
+      yOffset,
+      color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+      initialScale: { x: 0.1, y: 0.1, z: 0.1 }, // Planet size
+      currentScale: { x: 0.1, y: 0.1, z: 0.1 },
+      timeToLive: 60 + Math.random() * 60, // Seconds before it might decay or get pulled in
+      isStretching: false,
+      stretchAxis: { x: 0, y: 0, z: 1 }, // Default stretch along Z
+      progressValue: 0, // for animation, if needed
+    };
+    setSpawnedPlanets(prev => [...prev, newPlanet]);
+  }, [nextPlanetId, accretionDiskOuterRadius, accretionDiskInnerRadius]);
+
+  const handleAbsorbPlanet = useCallback((planetId: number) => {
+    setSpawnedPlanets(prev => prev.filter(p => p.id !== planetId));
+    setAbsorbedPlanetCount(prev => {
+      const newCount = prev + 1;
+      if (newCount % HAWKING_RADIATION_THRESHOLD === 0 && newCount > 0) {
+        setIsEmittingJets(true);
+        setTimeout(() => setIsEmittingJets(false), HAWKING_RADIATION_DURATION);
+      }
+      return newCount;
+    });
+  }, []);
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="flex h-screen w-screen overflow-hidden">
-        <Sidebar side="right" collapsible="icon" className="border-l border-sidebar-border shadow-2xl" variant="sidebar">
-          <SidebarHeader className="p-2 flex justify-between items-center bg-sidebar-background border-b border-sidebar-border">
-            <h1 className="text-lg font-headline text-sidebar-foreground px-2">Controls</h1>
-            <SidebarTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-              </Button>
-            </SidebarTrigger>
-          </SidebarHeader>
-          <ControlPanel
-            blackHoleRadius={blackHoleRadius}
-            setBlackHoleRadius={handleBlackHoleRadiusChange}
-            accretionDiskInnerRadius={accretionDiskInnerRadius}
-            setAccretionDiskInnerRadius={handleAccretionDiskInnerRadiusChange}
-            accretionDiskOuterRadius={accretionDiskOuterRadius}
-            setAccretionDiskOuterRadius={handleAccretionDiskOuterRadiusChange}
-            accretionDiskOpacity={accretionDiskOpacity}
-            setAccretionDiskOpacity={setAccretionDiskOpacity}
-            cameraPosition={cameraPosition}
-          />
-        </Sidebar>
-
-        <SidebarInset className="flex-1 bg-background relative">
-          <div className="absolute top-4 left-4 z-10 md:hidden">
-             <SidebarTrigger asChild>
-                <Button variant="outline" size="icon" className="bg-card/80 backdrop-blur-sm">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-                </Button>
-            </SidebarTrigger>
-          </div>
-          <Suspense fallback={<Skeleton className="w-full h-full bg-muted-foreground/20 rounded-none" />}>
-            <ThreeBlackholeCanvas
+    <div className="flex h-screen w-screen overflow-hidden bg-background relative">
+      <div className="absolute top-4 right-4 z-20">
+        <Sheet open={showControlsPanel} onOpenChange={setShowControlsPanel}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="bg-card/80 backdrop-blur-sm text-foreground hover:bg-accent hover:text-accent-foreground">
+              <Info className="h-5 w-5" />
+              <span className="sr-only">Toggle Controls</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-[350px] sm:w-[400px] bg-sidebar text-sidebar-foreground border-sidebar-border p-0">
+            <SheetHeader className="p-4 border-b border-sidebar-border">
+              <SheetTitle className="text-xl font-headline text-sidebar-foreground">Simulation Controls</SheetTitle>
+            </SheetHeader>
+            <ControlPanel
               blackHoleRadius={blackHoleRadius}
+              setBlackHoleRadius={handleBlackHoleRadiusChange}
               accretionDiskInnerRadius={accretionDiskInnerRadius}
+              setAccretionDiskInnerRadius={handleAccretionDiskInnerRadiusChange}
               accretionDiskOuterRadius={accretionDiskOuterRadius}
+              setAccretionDiskOuterRadius={handleAccretionDiskOuterRadiusChange}
               accretionDiskOpacity={accretionDiskOpacity}
-              onCameraUpdate={handleCameraUpdate}
+              setAccretionDiskOpacity={setAccretionDiskOpacity}
+              cameraPosition={cameraPosition}
+              onSpawnPlanetClick={handleSpawnPlanet}
             />
-          </Suspense>
-        </SidebarInset>
+          </SheetContent>
+        </Sheet>
       </div>
-    </SidebarProvider>
+
+      <div className="flex-1 w-full h-full">
+        <Suspense fallback={<Skeleton className="w-full h-full bg-muted-foreground/20 rounded-none" />}>
+          <ThreeBlackholeCanvas
+            blackHoleRadius={blackHoleRadius}
+            accretionDiskInnerRadius={accretionDiskInnerRadius}
+            accretionDiskOuterRadius={accretionDiskOuterRadius}
+            accretionDiskOpacity={accretionDiskOpacity}
+            onCameraUpdate={handleCameraUpdate}
+            spawnedPlanets={spawnedPlanets}
+            onAbsorbPlanet={handleAbsorbPlanet}
+            isEmittingJets={isEmittingJets}
+          />
+        </Suspense>
+      </div>
+    </div>
   );
 }
