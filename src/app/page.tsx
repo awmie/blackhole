@@ -46,7 +46,7 @@ const HAWKING_RADIATION_THRESHOLD = 3;
 const HAWKING_RADIATION_DURATION = 5000; // ms
 const SPAWNED_OBJECT_BASE_SPEED = 2.0;
 const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02;
-const SPAWNED_OBJECT_SPEED_SCALAR = 1.0; // Adjusted as simulationSpeed will be the main multiplier
+const SPAWNED_OBJECT_SPEED_SCALAR = 1.0;
 const CLOSE_SPAWN_TIME_TO_LIVE = 2.0;
 const CLOSE_SPAWN_RADIUS_FACTOR = 1.3;
 const DISSOLUTION_EFFECT_DURATION = 1.5;
@@ -59,7 +59,7 @@ export default function Home() {
   const [accretionDiskOuterRadius, setAccretionDiskOuterRadius] = useState(3);
   const [accretionDiskOpacity, setAccretionDiskOpacity] = useState(0.8);
   const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 2, z: 5 });
-  const [simulationSpeed, setSimulationSpeed] = useState(1.5); // Default speed factor
+  const [simulationSpeed, setSimulationSpeed] = useState(1.5); 
 
   const [spawnedObjects, setSpawnedObjects] = useState<PlanetState[]>([]);
   const [nextObjectId, setNextObjectId] = useState(0);
@@ -112,7 +112,7 @@ export default function Home() {
       objectOrbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
       currentAngle = Math.atan2(clickPosition.z, clickPosition.x);
       yOffset = clickPosition.y;
-      objectOrbitRadius = Math.max(objectOrbitRadius, blackHoleRadius + 0.1);
+      objectOrbitRadius = Math.max(objectOrbitRadius, blackHoleRadius * 0.98); // Ensures very close spawns trigger dissolution
     } else {
       objectOrbitRadius = accretionDiskInnerRadius + (accretionDiskOuterRadius - accretionDiskInnerRadius) * (0.2 + Math.random() * 0.8);
       currentAngle = Math.random() * Math.PI * 2;
@@ -121,7 +121,7 @@ export default function Home() {
 
     let angularVelocity = SPAWNED_OBJECT_BASE_SPEED * Math.pow(accretionDiskInnerRadius / objectOrbitRadius, 2.5);
     angularVelocity = Math.max(angularVelocity, SPAWNED_OBJECT_BASE_SPEED * SPAWNED_OBJECT_MIN_SPEED_FACTOR);
-    angularVelocity *= SPAWNED_OBJECT_SPEED_SCALAR * simulationSpeed; // Apply simulation speed
+    angularVelocity *= SPAWNED_OBJECT_SPEED_SCALAR * simulationSpeed; 
     angularVelocity = Math.abs(angularVelocity);
 
 
