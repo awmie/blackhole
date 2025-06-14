@@ -56,7 +56,7 @@ const baseAngularSpeed = 1.0;
 const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
 
-const PULL_IN_FACTOR_DISSOLVING = 0.1;
+const PULL_IN_FACTOR_DISSOLVING = 5.0; // Increased from 0.1
 const CONTINUOUS_ORBITAL_DECAY_RATE = 0.002;
 const PLANET_ORBITAL_DECAY_MULTIPLIER = 2.0; // Planets decay faster
 
