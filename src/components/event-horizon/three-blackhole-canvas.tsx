@@ -65,20 +65,19 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     const colorInner = new THREE.Color(1.0, 0.4, 0.8); 
     const colorMid = new THREE.Color(0.6, 0.3, 0.9);   
     const colorOuter = new THREE.Color(0.2, 0.1, 0.7); 
-    const colorPhotonRing = new THREE.Color(1.0, 0.95, 0.85); 
+    const colorPhotonRing = new THREE.Color(1.0, 0.95, 0.85); // Very bright, slightly yellowish white for the innermost edge
 
-    const baseAngularSpeed = 0.3; // Adjust for overall speed
-    const minAngularSpeedFactor = 0.2; // Slowest particles (at outerR) will have this fraction of speed compared to radius=1
+    const baseAngularSpeed = 0.3; 
+    const minAngularSpeedFactor = 0.2; 
 
     for (let i = 0; i < NUM_PARTICLES; i++) {
       const i3 = i * 3;
       const radius = Math.random() * (outerR - innerR) + innerR;
       const angle = Math.random() * Math.PI * 2;
-      const yOffset = (Math.random() - 0.5) * 0.6; // Increased cloud thickness
+      // Make the disk thinner by reducing the yOffset range
+      const yOffset = (Math.random() - 0.5) * 0.25; // Reduced from 0.6 to 0.25
 
-      // Store particle data for animation
-      // Angular velocity inversely proportional to radius, with a minimum to prevent extreme speeds
-      const velocityFactor = Math.max(minAngularSpeedFactor, 1 / (radius * 0.5 + 0.5) ); // Added offset to avoid extreme speeds at small radii
+      const velocityFactor = Math.max(minAngularSpeedFactor, 1 / (radius * 0.5 + 0.5) );
       const angularVelocity = baseAngularSpeed * velocityFactor;
 
       particleDataRef.current.push({ radius, angle, angularVelocity, yOffset });
@@ -96,18 +95,28 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       } else {
         particleColor.lerpColors(colorMid, colorOuter, (normalizedDist - 0.5) * 2.0);
       }
-
-      const innerEdgeFactor = 1.0 - Math.min(1.0, Math.max(0.0, normalizedDist / 0.2));
-      particleColor.r += particleColor.r * innerEdgeFactor * 0.8;
-      particleColor.g += particleColor.g * innerEdgeFactor * 0.8;
-      particleColor.b += particleColor.b * innerEdgeFactor * 0.8;
       
-      if (normalizedDist < 0.03) {
-        let photonRingIntensity = (0.03 - normalizedDist) / 0.03;
-        photonRingIntensity = Math.pow(photonRingIntensity, 2.0);
-        particleColor.r += colorPhotonRing.r * photonRingIntensity * 2.0;
-        particleColor.g += colorPhotonRing.g * photonRingIntensity * 2.0;
-        particleColor.b += colorPhotonRing.b * photonRingIntensity * 2.0;
+      // Photon ring effect: make the innermost edge much brighter and whiter
+      const photonRingThreshold = 0.03; // How much of the inner disk gets the bright effect (3%)
+      if (normalizedDist < photonRingThreshold) {
+        // Intensity falls off sharply from the inner edge
+        let photonRingIntensity = (photonRingThreshold - normalizedDist) / photonRingThreshold;
+        photonRingIntensity = Math.pow(photonRingIntensity, 2.0); // Sharper falloff
+
+        // Lerp towards the photon ring color and increase brightness
+        particleColor.lerp(colorPhotonRing, photonRingIntensity * 0.8); // Blend with photon ring color
+        // Significantly boost brightness for the photon ring effect
+        particleColor.r += particleColor.r * photonRingIntensity * 2.0; 
+        particleColor.g += particleColor.g * photonRingIntensity * 2.0;
+        particleColor.b += particleColor.b * photonRingIntensity * 2.0;
+      } else {
+        // For particles just outside the photon ring, still give some inner edge brightness
+        const innerEdgeFactor = 1.0 - Math.min(1.0, Math.max(0.0, (normalizedDist - photonRingThreshold) / 0.15)); // Adjust 0.15 for falloff width
+         if (innerEdgeFactor > 0) {
+            particleColor.r += particleColor.r * innerEdgeFactor * 0.8;
+            particleColor.g += particleColor.g * innerEdgeFactor * 0.8;
+            particleColor.b += particleColor.b * innerEdgeFactor * 0.8;
+        }
       }
 
       particleColor.r = Math.min(1.0, Math.max(0.0, particleColor.r));
@@ -123,7 +132,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const particlesMaterial = new THREE.PointsMaterial({
-      size: 0.01, // Finer particles
+      size: 0.01, 
       vertexColors: true,
       transparent: true,
       opacity: opacity,
@@ -143,7 +152,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
-    clockRef.current = new THREE.Clock(); // Initialize clock
+    clockRef.current = new THREE.Clock();
 
     const camera = new THREE.PerspectiveCamera(
       75,
@@ -175,7 +184,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       }
     });
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); 
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2); 
     scene.add(ambientLight);
 
     const blackHoleGeometry = new THREE.SphereGeometry(blackHoleRadius, 64, 64);
@@ -188,8 +197,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     
     const starsGeometry = new THREE.BufferGeometry();
     const starVertices = [];
-    for (let i = 0; i < 25000; i++) { 
-        const r = 100 + Math.random() * 300; 
+    for (let i = 0; i < 30000; i++) { 
+        const r = 100 + Math.random() * 350; 
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
         const x = r * Math.sin(theta) * Math.cos(phi);
@@ -198,7 +207,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         starVertices.push(x, y, z);
     }
     starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.3, sizeAttenuation: true }); 
+    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.35, sizeAttenuation: true }); 
     const stars = new THREE.Points(starsGeometry, starsMaterial);
     scene.add(stars);
     starsRef.current = stars;
@@ -219,7 +228,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
           const i3 = i * 3;
           positions[i3] = pData.radius * Math.cos(pData.angle);
-          // positions[i3 + 1] is pData.yOffset, which doesn't change per frame here
           positions[i3 + 2] = pData.radius * Math.sin(pData.angle);
         }
         accretionDiskRef.current.geometry.attributes.position.needsUpdate = true;
@@ -303,4 +311,3 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
-
