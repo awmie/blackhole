@@ -38,7 +38,7 @@ const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
 const PULL_IN_FACTOR = 0.1; 
 
-const DISSOLUTION_START_RADIUS_FACTOR = 1.1; 
+const DISSOLUTION_START_RADIUS_FACTOR = 1.05; // Reduced from 1.1
 const DISSOLUTION_DURATION = 1.5; 
 
 interface DiskParticleData {
@@ -506,13 +506,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             );
             
             currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (0.5 + progress * 1.5);
-            planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleActualRadius * 0.1);
+            planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleActualRadius * 0.1); // Prevent going to zero/negative radius
 
             if (progress >= 1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
-                // Note: object is not removed from spawnedPlanetsRef.current here,
-                // onAbsorbPlanet updates state in page.tsx, which then updates the prop,
-                // and the mesh cleanup logic handles the removal from scene.
             }
         } else {
             // Not dissolving: check for starting dissolution or direct absorption
@@ -523,7 +520,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
             } else if (planet.isStretching || planet.timeToLive < 10) { 
                 currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, planet.timeToLive));
-                planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleActualRadius * 0.5); 
+                planet.orbitRadius = currentOrbitRadius; // Allow to spiral in closer, relying on other checks for absorption/dissolution
             }
 
             // Update stretching state (only if not dissolving)
@@ -774,3 +771,5 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
 
+
+    
