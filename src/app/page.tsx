@@ -1,12 +1,30 @@
+
 "use client";
 
 import React, { useState, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { SidebarProvider, Sidebar, SidebarInset, SidebarHeader, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import ControlPanel from '@/components/event-horizon/control-panel';
+import { Skeleton } from '@/components/ui/skeleton';
+
 // Dynamically import ThreeBlackholeCanvas to ensure it's client-side only
 const ThreeBlackholeCanvas = React.lazy(() => import('@/components/event-horizon/three-blackhole-canvas'));
-import { Skeleton } from '@/components/ui/skeleton';
+
+// Skeleton loader for ControlPanel
+const ControlPanelSkeleton = () => (
+  <div className="p-4 space-y-6">
+    <Skeleton className="h-36 w-full rounded-lg bg-sidebar-accent/30" />
+    <Skeleton className="h-52 w-full rounded-lg bg-sidebar-accent/30" />
+    <Skeleton className="h-24 w-full rounded-lg bg-sidebar-accent/30" />
+  </div>
+);
+
+// Dynamically import ControlPanel with SSR disabled
+const ControlPanel = dynamic(() => import('@/components/event-horizon/control-panel'), {
+  ssr: false,
+  loading: () => <ControlPanelSkeleton />,
+});
+
 
 export default function Home() {
   const [blackHoleRadius, setBlackHoleRadius] = useState(1);
