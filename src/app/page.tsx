@@ -46,7 +46,7 @@ const HAWKING_RADIATION_THRESHOLD = 3;
 const HAWKING_RADIATION_DURATION = 5000;
 const SPAWNED_OBJECT_BASE_SPEED = 2.0;
 const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02;
-const SPAWNED_OBJECT_SPEED_SCALAR = 0.75;
+const SPAWNED_OBJECT_SPEED_SCALAR = 1.5; // Increased from 0.75
 const CLOSE_SPAWN_TIME_TO_LIVE = 1.5;
 const CLOSE_SPAWN_RADIUS_FACTOR = 1.3;
 
@@ -119,7 +119,6 @@ export default function Home() {
     let angularVelocity = SPAWNED_OBJECT_BASE_SPEED * Math.pow(accretionDiskInnerRadius / objectOrbitRadius, 2.5);
     angularVelocity = Math.max(angularVelocity, SPAWNED_OBJECT_BASE_SPEED * SPAWNED_OBJECT_MIN_SPEED_FACTOR);
     angularVelocity *= SPAWNED_OBJECT_SPEED_SCALAR; 
-    // Ensure angularVelocity is positive for consistent direction with accretion disk
     angularVelocity = Math.abs(angularVelocity);
 
 
