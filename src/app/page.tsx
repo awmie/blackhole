@@ -1,15 +1,14 @@
 
 "use client";
 
-import React, { useState, Suspense, useCallback, useEffect, useRef } from 'react';
+import React, { useState, Suspense, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import * as THREE from 'three';
+import type * as THREE from 'three';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Info } from 'lucide-react';
-// Assuming types are exported from three-blackhole-canvas or defined here
-// For now, let's define PlanetState here for clarity as it's primarily used by page.tsx
+
 
 export interface PlanetState {
   id: number;
@@ -27,10 +26,8 @@ export interface PlanetState {
   progressValue: number;
 }
 
-// Dynamically import ThreeBlackholeCanvas
 const ThreeBlackholeCanvas = React.lazy(() => import('@/components/event-horizon/three-blackhole-canvas'));
 
-// Dynamically import ControlPanel with SSR disabled
 const ControlPanel = dynamic(() => import('@/components/event-horizon/control-panel'), {
   ssr: false,
   loading: () => <ControlPanelSkeleton />,
@@ -46,7 +43,7 @@ const ControlPanelSkeleton = () => (
 );
 
 const HAWKING_RADIATION_THRESHOLD = 3;
-const HAWKING_RADIATION_DURATION = 5000; // 5 seconds
+const HAWKING_RADIATION_DURATION = 5000; 
 
 export default function Home() {
   const [blackHoleRadius, setBlackHoleRadius] = useState(1);
@@ -59,11 +56,14 @@ export default function Home() {
   const [nextObjectId, setNextObjectId] = useState(0);
   const [absorbedObjectCount, setAbsorbedObjectCount] = useState(0);
   const [isEmittingJets, setIsEmittingJets] = useState(false);
-  const [showControlsPanel, setShowControlsPanel] = useState(false); // Default to false, toggled by button
+  const [showControlsPanel, setShowControlsPanel] = useState(false);
 
   const [selectedObjectType, setSelectedObjectType] = useState<'planet' | 'star'>('planet');
-  const [simulationCamera, setSimulationCamera] = useState<THREE.PerspectiveCamera | null>(null);
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  
+  // simulationCamera state is kept for potential future use or if ControlPanel needs direct camera object.
+  // For shift-click spawning, ThreeBlackholeCanvas now uses its internal camera.
+  const [, setSimulationCamera] = useState<THREE.PerspectiveCamera | null>(null);
+
 
   const handleCameraUpdate = useCallback((position: { x: number; y: number; z: number }) => {
     setCameraPosition(position);
@@ -104,23 +104,25 @@ export default function Home() {
     if (clickPosition) {
       orbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
       currentAngle = Math.atan2(clickPosition.z, clickPosition.x);
-      yOffset = clickPosition.y; // Or a small random value: (Math.random() - 0.5) * 0.1
+      yOffset = clickPosition.y; 
     } else {
       orbitRadius = accretionDiskInnerRadius + (accretionDiskOuterRadius - accretionDiskInnerRadius) * (0.2 + Math.random() * 0.8);
       currentAngle = Math.random() * Math.PI * 2;
       yOffset = (Math.random() - 0.5) * 0.1;
     }
     
-    const baseSpeed = 1.0;
+    const baseSpeed = 1.0; 
     const minSpeedFactor = 0.02;
+    
     let angularVelocity = baseSpeed * Math.pow(accretionDiskInnerRadius / orbitRadius, 2.5);
     angularVelocity = Math.max(angularVelocity, baseSpeed * minSpeedFactor) * (Math.random() > 0.5 ? 1 : -1);
 
+
     let color, initialScale;
     if (selectedObjectType === 'star') {
-      color = '#FFFF99'; // Bright yellowish white for stars
+      color = '#FFFF99'; 
       initialScale = { x: 0.2, y: 0.2, z: 0.2 };
-    } else { // planet
+    } else { 
       color = `hsl(${Math.random() * 360}, 70%, 60%)`;
       initialScale = { x: 0.1, y: 0.1, z: 0.1 };
     }
@@ -130,7 +132,7 @@ export default function Home() {
       type: selectedObjectType,
       orbitRadius,
       currentAngle,
-      angularVelocity: angularVelocity * 0.5,
+      angularVelocity: angularVelocity * 0.5, 
       yOffset,
       color,
       initialScale,
@@ -155,38 +157,9 @@ export default function Home() {
     });
   }, []);
 
-  const handleShiftClickSpawn = useCallback((event: PointerEvent) => {
-    if (!event.shiftKey || !simulationCamera || !canvasContainerRef.current) return;
-
-    const rect = canvasContainerRef.current.getBoundingClientRect();
-    const mouse = new THREE.Vector2();
-    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, simulationCamera);
-
-    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Spawning on Y=0 plane
-    const intersectionPoint = new THREE.Vector3();
-    
-    if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
-      handleSpawnObject(intersectionPoint);
-    }
-  }, [simulationCamera, handleSpawnObject]);
-
-  useEffect(() => {
-    const container = canvasContainerRef.current;
-    if (container) {
-      container.addEventListener('pointerdown', handleShiftClickSpawn as EventListener);
-      return () => {
-        container.removeEventListener('pointerdown', handleShiftClickSpawn as EventListener);
-      };
-    }
-  }, [handleShiftClickSpawn]);
-
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background relative" ref={canvasContainerRef}>
+    <div className="flex h-screen w-screen overflow-hidden bg-background relative">
       <div className="absolute top-4 right-4 z-20">
         <Sheet open={showControlsPanel} onOpenChange={setShowControlsPanel}>
           <SheetTrigger asChild>
@@ -209,7 +182,7 @@ export default function Home() {
               accretionDiskOpacity={accretionDiskOpacity}
               setAccretionDiskOpacity={setAccretionDiskOpacity}
               cameraPosition={cameraPosition}
-              onSpawnObjectClick={() => handleSpawnObject()} // Button click spawns without specific position
+              onSpawnObjectClick={() => handleSpawnObject()} 
               selectedObjectType={selectedObjectType}
               setSelectedObjectType={setSelectedObjectType}
             />
@@ -225,10 +198,11 @@ export default function Home() {
             accretionDiskOuterRadius={accretionDiskOuterRadius}
             accretionDiskOpacity={accretionDiskOpacity}
             onCameraUpdate={handleCameraUpdate}
-            spawnedPlanets={spawnedObjects} // Renamed prop for clarity
-            onAbsorbPlanet={handleAbsorbObject} // Prop name kept for now
+            spawnedPlanets={spawnedObjects}
+            onAbsorbPlanet={handleAbsorbObject}
             isEmittingJets={isEmittingJets}
             onCameraReady={setSimulationCamera}
+            onShiftClickSpawnAtPoint={handleSpawnObject}
           />
         </Suspense>
       </div>
