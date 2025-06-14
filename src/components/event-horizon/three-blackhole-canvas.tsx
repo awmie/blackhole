@@ -156,7 +156,8 @@ const STAR_LIGHT_PARTICLE_LIFESPAN = 3.0;
 const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05; 
 const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02; 
 const STAR_LIGHT_PARTICLE_SIZE = 0.01;
-const STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND = 0.005; // Star loses 0.5% of its mass per second
+const STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND = 0.005; 
+const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8;
 
 
 const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
@@ -617,6 +618,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         
         const currentStarMassFactor = (planetProp.type === 'star' ? planetProp.currentMassFactor : 1.0) ?? 1.0;
 
+        const currentPositionVec = new THREE.Vector3(
+            currentPlanetOrbitRadius * Math.cos(currentPlanetAngle),
+            planetProp.yOffset,
+            currentPlanetOrbitRadius * Math.sin(currentPlanetAngle)
+        );
+
         if (planetProp.isDissolving) {
             let progress = dissolvingObjectsProgressRef.current.get(planetProp.id) || 0;
             progress += deltaTime / DISSOLUTION_DURATION;
@@ -673,12 +680,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                  object3D.quaternion.slerp(new THREE.Quaternion(), 0.1); 
             }
             currentPlanetOrbitRadius -= CONTINUOUS_ORBITAL_DECAY_RATE * blackHoleActualRadius * deltaTime;
-
-            const currentPositionVec = new THREE.Vector3(
-              currentPlanetOrbitRadius * Math.cos(currentPlanetAngle),
-              planetProp.yOffset,
-              currentPlanetOrbitRadius * Math.sin(currentPlanetAngle)
-            );
             
             if (currentPositionVec.length() < blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR && !planetProp.isDissolving) {
                 if (onSetPlanetDissolvingRef.current) onSetPlanetDissolvingRef.current(planetProp.id, true);
@@ -690,29 +691,33 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.05); 
 
             if (planetProp.type === 'star' && starEmittedParticlesRef.current && starEmittedParticleDataRef.current.length > 0 && object3D) {
-                const starColor = new THREE.Color(planetProp.color);
-                for (let i = 0; i < STAR_LIGHT_EMIT_RATE_PER_FRAME; i++) {
-                    const pIndex = lastStarEmittedParticleIndexRef.current;
-                    const particle = starEmittedParticleDataRef.current[pIndex];
-                    if (particle && !particle.active) {
-                        particle.active = true;
-                        particle.position.copy(object3D.position);
-                        const randomDirection = new THREE.Vector3(
-                            Math.random() - 0.5,
-                            Math.random() - 0.5,
-                            Math.random() - 0.5
-                        ).normalize();
-                        particle.velocity.copy(randomDirection).multiplyScalar(STAR_LIGHT_PARTICLE_INITIAL_SPEED * (0.8 + Math.random() * 0.4));
-                        particle.life = 1.0;
-                        particle.initialLife = STAR_LIGHT_PARTICLE_LIFESPAN + Math.random() * 0.2; 
-                        particle.color.copy(starColor).multiplyScalar(0.7 + Math.random() * 0.3); 
-                        particle.size = STAR_LIGHT_PARTICLE_SIZE * (0.8 + Math.random() * 0.4);
-                    }
-                    lastStarEmittedParticleIndexRef.current = (pIndex + 1) % STAR_EMITTED_PARTICLE_COUNT;
-                }
                 // Continuous mass loss for existing stars
                 if (onStarMassLossRef.current) {
                     onStarMassLossRef.current(planetProp.id, STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND * deltaTime);
+                }
+
+                // Emit light glow particles only if near the black hole
+                if (currentPositionVec.length() < blackHoleActualRadius * STAR_LIGHT_EMISSION_PROXIMITY_FACTOR) {
+                    const starColor = new THREE.Color(planetProp.color);
+                    for (let i = 0; i < STAR_LIGHT_EMIT_RATE_PER_FRAME; i++) {
+                        const pIndex = lastStarEmittedParticleIndexRef.current;
+                        const particle = starEmittedParticleDataRef.current[pIndex];
+                        if (particle && !particle.active) {
+                            particle.active = true;
+                            particle.position.copy(object3D.position);
+                            const randomDirection = new THREE.Vector3(
+                                Math.random() - 0.5,
+                                Math.random() - 0.5,
+                                Math.random() - 0.5
+                            ).normalize();
+                            particle.velocity.copy(randomDirection).multiplyScalar(STAR_LIGHT_PARTICLE_INITIAL_SPEED * (0.8 + Math.random() * 0.4));
+                            particle.life = 1.0;
+                            particle.initialLife = STAR_LIGHT_PARTICLE_LIFESPAN + Math.random() * 0.2; 
+                            particle.color.copy(starColor).multiplyScalar(0.7 + Math.random() * 0.3); 
+                            particle.size = STAR_LIGHT_PARTICLE_SIZE * (0.8 + Math.random() * 0.4);
+                        }
+                        lastStarEmittedParticleIndexRef.current = (pIndex + 1) % STAR_EMITTED_PARTICLE_COUNT;
+                    }
                 }
             }
         }
@@ -735,6 +740,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 const forceDirection = new THREE.Vector3().subVectors(new THREE.Vector3(0,0,0), p.position);
                 const distanceSq = Math.max(0.1, p.position.lengthSq()); 
                 
+                // Determine gravity factor based on whether it's a dissolution particle or a light glow particle
+                // Shorter initialLife means it's likely a dissolution particle (more affected by gravity)
+                // Longer initialLife means it's a light glow particle (less affected by gravity)
                 const gravityFactor = p.initialLife < (STAR_DISSOLUTION_PARTICLE_LIFESPAN + STAR_LIGHT_PARTICLE_LIFESPAN) / 2 
                                       ? STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR 
                                       : STAR_LIGHT_PARTICLE_GRAVITY_FACTOR;
@@ -1060,5 +1068,6 @@ export default ThreeBlackholeCanvas;
     
 
     
+
 
 
