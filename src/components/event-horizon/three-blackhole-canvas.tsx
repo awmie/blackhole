@@ -215,6 +215,16 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     spawnedPlanetsRef_anim.current = spawnedPlanets;
   }, [spawnedPlanets]);
 
+  const isEmittingJetsRef = useRef(isEmittingJets);
+  useEffect(() => {
+    isEmittingJetsRef.current = isEmittingJets;
+  }, [isEmittingJets]);
+
+  const blackHoleRadiusRef_anim = useRef(blackHoleRadius);
+   useEffect(() => {
+    blackHoleRadiusRef_anim.current = blackHoleRadius;
+  }, [blackHoleRadius]);
+
 
   useEffect(() => {
     onShiftClickSpawnAtPointRef.current = onShiftClickSpawnAtPoint;
@@ -238,13 +248,13 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 
   const createAndAddAccretionParticles = useCallback((
-    scene: THREE_TYPE.Scene,
     innerR: number,
     outerR: number,
     opacity: number
   ) => {
     const THREE = THREEInstanceRef.current;
-    if (!THREE) return;
+    const scene = sceneRef.current;
+    if (!THREE || !scene) return;
 
     if (accretionDiskRef.current) {
       scene.remove(accretionDiskRef.current);
@@ -336,9 +346,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     accretionDiskRef.current = newDisk;
   }, []);
 
-  const initJetParticles = useCallback((scene: THREE_TYPE.Scene) => {
+  const initJetParticles = useCallback(() => {
     const THREE = THREEInstanceRef.current;
-    if (!THREE) return;
+    const scene = sceneRef.current;
+    if (!THREE || !scene) return;
 
     if (jetParticlesRef.current) {
         scene.remove(jetParticlesRef.current);
@@ -389,9 +400,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     scene.add(jetParticlesRef.current);
   }, []);
 
-  const initStarEmittedParticles = useCallback((scene: THREE_TYPE.Scene) => {
+  const initStarEmittedParticles = useCallback(() => {
     const THREE = THREEInstanceRef.current;
-    if (!THREE) return;
+    const scene = sceneRef.current;
+    if (!THREE || !scene) return;
 
     if (starEmittedParticlesRef.current) {
         scene.remove(starEmittedParticlesRef.current);
@@ -410,10 +422,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     for (let i = 0; i < STAR_EMITTED_PARTICLE_COUNT; i++) {
         starEmittedParticleDataRef.current.push({
             id: i,
-            position: new THREE.Vector3(0, -1000, 0), // Start inactive particles far away
+            position: new THREE.Vector3(0, -1000, 0), 
             velocity: new THREE.Vector3(),
-            life: 0, // Start with no life
-            initialLife: STAR_LIGHT_PARTICLE_LIFESPAN, // Default to light particle lifespan
+            life: 0, 
+            initialLife: STAR_LIGHT_PARTICLE_LIFESPAN, 
             color: new THREE.Color(1, 1, 1),
             size: STAR_LIGHT_PARTICLE_SIZE,
             active: false,
@@ -427,7 +439,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colorsAttribute, 3));
 
     starEmittedParticleMaterialRef.current = new THREE.PointsMaterial({
-        size: 0.02, // Base size, will be overridden by particle.size
+        size: 0.02, 
         vertexColors: true,
         transparent: true,
         blending: THREE.AdditiveBlending,
@@ -447,15 +459,16 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     const scene = sceneRef.current;
     if (!scene || !THREEInstanceRef.current) return;
 
-    initJetParticles(scene);
-    initStarEmittedParticles(scene);
+    initJetParticles();
+    initStarEmittedParticles();
   }, [initJetParticles, initStarEmittedParticles]);
 
 
   useEffect(() => {
     if (!mountRef.current) return;
 
-    THREEInstanceRef.current = require('three');
+    const LocalTHREE = require('three');
+    THREEInstanceRef.current = LocalTHREE;
     const THREE = THREEInstanceRef.current;
     if (!THREE) return;
 
@@ -475,7 +488,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       0.1,
       1000
     );
-    camera.position.set(0, blackHoleRadius * 1.5, blackHoleRadius * 4);
+    camera.position.set(0, blackHoleRadiusRef_anim.current * 1.5, blackHoleRadiusRef_anim.current * 4);
     cameraRef.current = camera;
     if (onCameraReady) {
       onCameraReady(camera);
@@ -495,7 +508,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
-    controls.minDistance = blackHoleRadius * 1.2;
+    controls.minDistance = blackHoleRadiusRef_anim.current * 1.2;
     controls.maxDistance = 500;
     controlsRef.current = controls;
 
@@ -518,7 +531,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     scene.add(blackHoleMesh);
     blackHoleRef.current = blackHoleMesh;
 
-    createAndAddAccretionParticles(scene, accretionDiskInnerRadius, accretionDiskOuterRadius, accretionDiskOpacity);
+    createAndAddAccretionParticles(accretionDiskInnerRadius, accretionDiskOuterRadius, accretionDiskOpacity);
 
     const starsGeometry = new THREE.BufferGeometry();
     const starVertices = [];
@@ -541,10 +554,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     scene.add(directionalLight);
 
     if (!jetParticlesRef.current) {
-      initJetParticles(scene);
+      initJetParticles();
     }
     if (!starEmittedParticlesRef.current) {
-      initStarEmittedParticles(scene);
+      initStarEmittedParticles();
     }
 
 
@@ -617,7 +630,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         let currentPlanetOrbitRadius = evolvingData.radius;
         const currentPlanetAngle = evolvingData.angle;
         const currentPlanetTimeToLive = evolvingData.ttl;
-        const blackHoleActualRadius = blackHoleRadius;
+        const blackHoleActualRadius = blackHoleRadiusRef_anim.current;
 
         const currentStarMassFactor = (planetProp.type === 'star' ? planetProp.currentMassFactor : 1.0) ?? 1.0;
 
@@ -658,7 +671,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                             Math.random() - 0.5
                         ).normalize();
                         particle.velocity.copy(randomDirection).multiplyScalar(STAR_DISSOLUTION_PARTICLE_INITIAL_SPEED);
-                        particle.life = 1.0; // Normalized life
+                        particle.life = 1.0; 
                         particle.initialLife = STAR_DISSOLUTION_PARTICLE_LIFESPAN + Math.random() * 0.1;
                         particle.color.copy(starColor);
                         particle.size = 0.015 + Math.random() * 0.01;
@@ -673,7 +686,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                  evolvingPlanetDataRef.current.delete(planetProp.id);
                  dissolvingObjectsProgressRef.current.delete(planetProp.id);
             }
-        } else { // Object is NOT dissolving
+        } else { 
             object3D.scale.set(
               planetProp.initialScale.x * currentStarMassFactor,
               planetProp.initialScale.y * currentStarMassFactor,
@@ -700,7 +713,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.05);
 
             if (planetProp.type === 'star' && starEmittedParticlesRef.current && starEmittedParticleDataRef.current.length > 0 && object3D) {
-                // Continuous mass loss and light particle emission for stars (if close enough)
                 if (currentPositionVec.length() < blackHoleActualRadius * STAR_LIGHT_EMISSION_PROXIMITY_FACTOR) {
                     if (onStarMassLossRef.current) {
                         onStarMassLossRef.current(planetProp.id, STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND * deltaTime);
@@ -719,7 +731,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                                 Math.random() - 0.5
                             ).normalize();
                             particle.velocity.copy(randomDirection).multiplyScalar(STAR_LIGHT_PARTICLE_INITIAL_SPEED * (0.8 + Math.random() * 0.4));
-                            particle.life = 1.0; // Normalized life
+                            particle.life = 1.0; 
                             particle.initialLife = STAR_LIGHT_PARTICLE_LIFESPAN + Math.random() * 0.2;
                             particle.color.copy(starColor).multiplyScalar(0.7 + Math.random() * 0.3);
                             particle.size = STAR_LIGHT_PARTICLE_SIZE * (0.8 + Math.random() * 0.4);
@@ -747,9 +759,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 hasActiveStarParticles = true;
                 const forceDirection = new THREE.Vector3().subVectors(new THREE.Vector3(0,0,0), p.position);
                 const distanceSq = Math.max(0.1, p.position.lengthSq());
-
-                // Differentiate gravity factor based on particle type (inferred from initialLife)
-                const gravityFactor = p.initialLife > STAR_DISSOLUTION_PARTICLE_LIFESPAN // Heuristic: light particles have longer lifespans
+                
+                const gravityFactor = p.initialLife > STAR_DISSOLUTION_PARTICLE_LIFESPAN 
                                       ? STAR_LIGHT_PARTICLE_GRAVITY_FACTOR
                                       : STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR;
 
@@ -757,28 +768,28 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
                 p.velocity.addScaledVector(forceDirection, deltaTime);
                 p.position.addScaledVector(p.velocity, deltaTime);
-                p.life -= deltaTime / p.initialLife; // Life decreases relative to its initial life
+                p.life -= deltaTime / p.initialLife; 
 
                 const i3 = i * 3;
                 positions[i3] = p.position.x;
                 positions[i3 + 1] = p.position.y;
                 positions[i3 + 2] = p.position.z;
 
-                const fade = Math.max(0, p.life); // Use normalized life for fading
+                const fade = Math.max(0, p.life); 
                 colors[i3] = p.color.r * fade;
                 colors[i3 + 1] = p.color.g * fade;
                 colors[i3 + 2] = p.color.b * fade;
 
 
-                if (p.life <= 0 || p.position.lengthSq() < (blackHoleRadius * blackHoleRadius * 0.01) ) {
+                if (p.life <= 0 || p.position.lengthSq() < (blackHoleRadiusRef_anim.current * blackHoleRadiusRef_anim.current * 0.01) ) {
                     p.active = false;
-                    positions[i3+1] = -1000; // Move inactive particles far away
+                    positions[i3+1] = -1000; 
                 }
             } else if (!p.active) {
                  const i3 = i * 3;
-                 if(positions[i3+1] > -999) { // Check if it was recently made inactive
+                 if(positions[i3+1] > -999) { 
                     positions[i3+1] = -1000;
-                    hasActiveStarParticles = true; // Needs update if positions changed
+                    hasActiveStarParticles = true; 
                  }
             }
         });
@@ -786,7 +797,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             starEmittedParticlesRef.current.geometry.attributes.position.needsUpdate = true;
             starEmittedParticlesRef.current.geometry.attributes.color.needsUpdate = true;
         }
-        starEmittedParticlesRef.current.visible = true; // Always visible, particles just move far away when inactive
+        starEmittedParticlesRef.current.visible = true; 
       }
 
 
@@ -809,9 +820,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     colorsAttribute[i * 3 + 1] = p.color.g * fade;
                     colorsAttribute[i * 3 + 2] = p.color.b * fade;
                     activeJets = true;
-                } else if (isEmittingJets && Math.random() < 0.1) { // Activate some particles if jets are on
+                } else if (isEmittingJetsRef.current && Math.random() < 0.20) { 
                     const direction = Math.random() > 0.5 ? 1 : -1;
-                    p.position.set(0, direction * blackHoleRadius * 1.05, 0);
+                    p.position.set(0, direction * blackHoleRadiusRef_anim.current * 1.05, 0);
 
                     const spreadAngle = Math.PI / 4; 
                     const coneAngle = Math.random() * Math.PI * 2; 
@@ -823,22 +834,22 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         Math.sin(elevationAngle) * Math.sin(coneAngle)
                     );
                     
-                    const randomOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(0.35);
+                    const randomOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(0.5);
                     velDir.add(randomOffset);
 
                     p.velocity.copy(velDir.normalize().multiplyScalar(JET_SPEED * (0.7 + Math.random() * 0.6))); 
 
-                    p.life = 1.0; // Normalized life
+                    p.life = 1.0; 
                     p.initialLife = JET_LIFESPAN * (0.6 + Math.random() * 0.8); 
                     p.color.setHSL(Math.random() * 0.15 + 0.50, 0.95, 0.75); 
                     activeJets = true;
-                } else { // Particle is dead and jets are not re-activating it
-                    positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0; // Hide
+                } else { 
+                    positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0; 
                     colorsAttribute[i * 3] = 0; colorsAttribute[i * 3 + 1] = 0; colorsAttribute[i * 3 + 2] = 0;
                 }
             });
-            jetParticlesRef.current.visible = activeJets || isEmittingJets;
-            if (activeJets || isEmittingJets) { // Only update buffers if there's something to show/change
+            jetParticlesRef.current.visible = activeJets || isEmittingJetsRef.current;
+            if (activeJets || isEmittingJetsRef.current) { 
               jetParticlesRef.current.geometry.attributes.position.needsUpdate = true;
               jetParticlesRef.current.geometry.attributes.color.needsUpdate = true;
             }
@@ -872,11 +883,16 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       planetMeshesRef.current.forEach(object => {
         sceneRef.current?.remove(object);
         if (object instanceof THREE_TYPE.Group) {
-          const sphere = object.children[0] as THREE_TYPE.Mesh;
-          sphere?.geometry?.dispose();
-          if (sphere?.material) {
-            (sphere.material as THREE_TYPE.Material).dispose();
-          }
+          object.traverse(child => {
+             if (child instanceof THREE_TYPE.Mesh) {
+                child.geometry?.dispose();
+                 if (Array.isArray(child.material)) {
+                    child.material.forEach(m => m.dispose());
+                } else {
+                    (child.material as THREE_TYPE.Material)?.dispose();
+                }
+             }
+          });
         } else if (object instanceof THREE_TYPE.Mesh) {
           object.geometry?.dispose();
           if (object.material) {
@@ -943,13 +959,13 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
   useEffect(() => {
     if (blackHoleRef.current) {
-      blackHoleRef.current.scale.set(blackHoleRadius, blackHoleRadius, blackHoleRadius);
+      blackHoleRef.current.scale.set(blackHoleRadiusRef_anim.current, blackHoleRadiusRef_anim.current, blackHoleRadiusRef_anim.current);
     }
     if (controlsRef.current) {
-        controlsRef.current.minDistance = blackHoleRadius * 1.2;
+        controlsRef.current.minDistance = blackHoleRadiusRef_anim.current * 1.2;
     }
-     if (cameraRef.current && cameraRef.current.position.length() < blackHoleRadius * 1.2) {
-        const newPos = cameraRef.current.position.clone().normalize().multiplyScalar(blackHoleRadius * 1.2);
+     if (cameraRef.current && cameraRef.current.position.length() < blackHoleRadiusRef_anim.current * 1.2) {
+        const newPos = cameraRef.current.position.clone().normalize().multiplyScalar(blackHoleRadiusRef_anim.current * 1.2);
         cameraRef.current.position.copy(newPos);
         if (onCameraUpdateRef.current) {
             onCameraUpdateRef.current({x: newPos.x, y: newPos.y, z:newPos.z});
@@ -960,7 +976,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   useEffect(() => {
     if (sceneRef.current && THREEInstanceRef.current) {
        createAndAddAccretionParticles(
-        sceneRef.current,
         accretionDiskInnerRadius,
         accretionDiskOuterRadius,
         accretionDiskOpacity
@@ -986,19 +1001,19 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         let sphereMaterial;
 
         if (planetProp.type === 'star') {
-          const starGroup = new THREE.Group(); // Stars are groups
-          sphereMaterial = new THREE.MeshBasicMaterial({ color: planetProp.color }); // Glowy material
+          const starGroup = new THREE.Group(); 
+          sphereMaterial = new THREE.MeshBasicMaterial({ color: planetProp.color }); 
           const starSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
           starGroup.add(starSphere);
           object3D = starGroup;
-        } else { // Planets are simple meshes
+        } else { 
           sphereMaterial = new THREE.MeshStandardMaterial({ color: planetProp.color, roughness: 0.5, metalness: 0.1 });
           object3D = new THREE.Mesh(sphereGeometry, sphereMaterial);
         }
 
         scene.add(object3D);
         planetMeshesRef.current.set(planetProp.id, object3D);
-        (object3D as any).userData = { planetId: planetProp.id }; // For easier identification if needed
+        (object3D as any).userData = { planetId: planetProp.id }; 
 
         evolvingPlanetDataRef.current.set(planetProp.id, {
           id: planetProp.id,
@@ -1007,7 +1022,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
           ttl: planetProp.timeToLive,
         });
       } else {
-        // Update existing object's material color if it changed (e.g., if planetProp.color could change)
+        
         if (planetProp.type === 'star' && object3D instanceof THREE.Group) {
             const starSphere = object3D.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh;
             if (starSphere && starSphere.material instanceof THREE.MeshBasicMaterial) {
@@ -1016,7 +1031,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 }
             }
         } else if (planetProp.type === 'planet' && object3D instanceof THREE.Mesh) {
-            if (object3D.material instanceof THREE.MeshStandardMaterial) { // Check for MeshStandardMaterial
+            if (object3D.material instanceof THREE.MeshStandardMaterial) { 
                  if (object3D.material.color.getHexString() !== new THREE.Color(planetProp.color).getHexString()){
                     object3D.material.color.set(planetProp.color);
                 }
@@ -1024,23 +1039,23 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         }
       }
 
-      // Always update scale based on currentMassFactor (especially for stars)
+      
       object3D.scale.set(
           planetProp.initialScale.x * currentStarMassFactor,
           planetProp.initialScale.y * currentStarMassFactor,
           planetProp.initialScale.z * currentStarMassFactor
       );
 
-      // Sync evolving data's TTL if it has changed in the prop (e.g., due to dissolution start)
+      
       const evolvingData = evolvingPlanetDataRef.current.get(planetProp.id);
       if (evolvingData) {
-        if (planetProp.isDissolving && evolvingData.ttl > DISSOLUTION_DURATION) { // If dissolving, ensure TTL matches dissolution duration
+        if (planetProp.isDissolving && evolvingData.ttl > DISSOLUTION_DURATION) { 
              evolvingData.ttl = DISSOLUTION_DURATION;
         } else if (!planetProp.isDissolving && evolvingData.ttl < planetProp.timeToLive && planetProp.timeToLive > DISSOLUTION_DURATION) {
-            // If not dissolving and prop TTL is longer, update evolving TTL (e.g., if it was reset)
+            
             evolvingData.ttl = planetProp.timeToLive;
         }
-      } else if (!evolvingData && object3D) { // Should not happen if object3D exists, but defensive
+      } else if (!evolvingData && object3D) { 
          evolvingPlanetDataRef.current.set(planetProp.id, {
           id: planetProp.id,
           angle: planetProp.currentAngle,
@@ -1050,13 +1065,13 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       }
     });
 
-    // Remove meshes for planets that no longer exist in spawnedPlanets prop
+    
     currentPlanetObjectIds.forEach(id => {
       if (!incomingPlanetIds.has(id)) {
         const object3D = planetMeshesRef.current.get(id);
         if (object3D) {
           scene.remove(object3D);
-          if (object3D instanceof THREE.Group) { // Handle groups (stars)
+          if (object3D instanceof THREE.Group) { 
             object3D.traverse(child => {
               if (child instanceof THREE.Mesh) {
                 child.geometry?.dispose();
@@ -1067,7 +1082,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 }
               }
             });
-          } else if (object3D instanceof THREE.Mesh) { // Handle simple meshes (planets)
+          } else if (object3D instanceof THREE.Mesh) { 
             object3D.geometry?.dispose();
              if (object3D.material) { (object3D.material as THREE_TYPE.Material).dispose(); }
           }
@@ -1084,6 +1099,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
-
-
     
