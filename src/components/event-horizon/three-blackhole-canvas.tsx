@@ -15,6 +15,13 @@ interface ThreeBlackholeCanvasProps {
 
 const NUM_PARTICLES = 50000; // Number of particles in the accretion disk
 
+interface ParticleData {
+  radius: number;
+  angle: number;
+  angularVelocity: number;
+  yOffset: number;
+}
+
 const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   blackHoleRadius,
   accretionDiskInnerRadius,
@@ -28,8 +35,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const blackHoleRef = useRef<THREE.Mesh | null>(null);
-  const accretionDiskRef = useRef<THREE.Points | null>(null); // Changed to THREE.Points
+  const accretionDiskRef = useRef<THREE.Points | null>(null);
   const starsRef = useRef<THREE.Points | null>(null);
+  const clockRef = useRef<THREE.Clock>(new THREE.Clock());
+  const particleDataRef = useRef<ParticleData[]>([]);
 
   const createAndAddAccretionParticles = (
     scene: THREE.Scene,
@@ -51,24 +60,35 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     const particlesGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(NUM_PARTICLES * 3);
     const colors = new Float32Array(NUM_PARTICLES * 3);
+    particleDataRef.current = [];
 
-    const colorInner = new THREE.Color(1.0, 0.4, 0.8); // Pinkish/Magenta
-    const colorMid = new THREE.Color(0.6, 0.3, 0.9);   // Purple
-    const colorOuter = new THREE.Color(0.2, 0.1, 0.7); // Darker Blue/Purple
-    const colorPhotonRing = new THREE.Color(1.0, 0.95, 0.85); // Bright yellowish-white
+    const colorInner = new THREE.Color(1.0, 0.4, 0.8); 
+    const colorMid = new THREE.Color(0.6, 0.3, 0.9);   
+    const colorOuter = new THREE.Color(0.2, 0.1, 0.7); 
+    const colorPhotonRing = new THREE.Color(1.0, 0.95, 0.85); 
+
+    const baseAngularSpeed = 0.3; // Adjust for overall speed
+    const minAngularSpeedFactor = 0.2; // Slowest particles (at outerR) will have this fraction of speed compared to radius=1
 
     for (let i = 0; i < NUM_PARTICLES; i++) {
       const i3 = i * 3;
       const radius = Math.random() * (outerR - innerR) + innerR;
       const angle = Math.random() * Math.PI * 2;
-      const yOffset = (Math.random() - 0.5) * 0.4; // Cloud thickness
+      const yOffset = (Math.random() - 0.5) * 0.6; // Increased cloud thickness
+
+      // Store particle data for animation
+      // Angular velocity inversely proportional to radius, with a minimum to prevent extreme speeds
+      const velocityFactor = Math.max(minAngularSpeedFactor, 1 / (radius * 0.5 + 0.5) ); // Added offset to avoid extreme speeds at small radii
+      const angularVelocity = baseAngularSpeed * velocityFactor;
+
+      particleDataRef.current.push({ radius, angle, angularVelocity, yOffset });
 
       positions[i3] = radius * Math.cos(angle);
       positions[i3 + 1] = yOffset;
       positions[i3 + 2] = radius * Math.sin(angle);
 
       let normalizedDist = (radius - innerR) / (outerR - innerR);
-      normalizedDist = Math.max(0, Math.min(1, normalizedDist)); // Clamp [0,1]
+      normalizedDist = Math.max(0, Math.min(1, normalizedDist)); 
 
       const particleColor = new THREE.Color();
       if (normalizedDist < 0.5) {
@@ -103,7 +123,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const particlesMaterial = new THREE.PointsMaterial({
-      size: 0.03,
+      size: 0.01, // Finer particles
       vertexColors: true,
       transparent: true,
       opacity: opacity,
@@ -118,12 +138,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   };
 
 
-  // Effect for initializing and cleaning up Three.js scene
   useEffect(() => {
     if (!mountRef.current) return;
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
+    clockRef.current = new THREE.Clock(); // Initialize clock
 
     const camera = new THREE.PerspectiveCamera(
       75,
@@ -155,7 +175,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       }
     });
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2); // Slightly brighter ambient
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); 
     scene.add(ambientLight);
 
     const blackHoleGeometry = new THREE.SphereGeometry(blackHoleRadius, 64, 64);
@@ -168,7 +188,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     
     const starsGeometry = new THREE.BufferGeometry();
     const starVertices = [];
-    for (let i = 0; i < 20000; i++) { // Increased star count
+    for (let i = 0; i < 25000; i++) { 
         const r = 100 + Math.random() * 300; 
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
@@ -178,7 +198,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         starVertices.push(x, y, z);
     }
     starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.25, sizeAttenuation: true }); // Slightly larger stars
+    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.3, sizeAttenuation: true }); 
     const stars = new THREE.Points(starsGeometry, starsMaterial);
     scene.add(stars);
     starsRef.current = stars;
@@ -187,8 +207,22 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       controls.update();
-      if (accretionDiskRef.current) {
-        accretionDiskRef.current.rotation.y += 0.0005; // Slower rotation for a grander scale
+      const deltaTime = clockRef.current.getDelta();
+
+      if (accretionDiskRef.current && accretionDiskRef.current.geometry) {
+        const positions = accretionDiskRef.current.geometry.attributes.position.array as Float32Array;
+        const particleData = particleDataRef.current;
+
+        for (let i = 0; i < particleData.length; i++) {
+          const pData = particleData[i];
+          pData.angle += pData.angularVelocity * deltaTime;
+
+          const i3 = i * 3;
+          positions[i3] = pData.radius * Math.cos(pData.angle);
+          // positions[i3 + 1] is pData.yOffset, which doesn't change per frame here
+          positions[i3 + 2] = pData.radius * Math.sin(pData.angle);
+        }
+        accretionDiskRef.current.geometry.attributes.position.needsUpdate = true;
       }
       renderer.render(scene, camera);
     };
@@ -222,7 +256,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
           }
         }
       });
-      if (accretionDiskRef.current) { // Ensure disposal if component unmounts before accretionDiskRef is cleared by updates
+      if (accretionDiskRef.current) { 
          accretionDiskRef.current.geometry?.dispose();
          if (Array.isArray(accretionDiskRef.current.material)) {
             accretionDiskRef.current.material.forEach(m => m.dispose());
@@ -231,11 +265,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
          }
       }
       controlsRef.current?.dispose();
+      particleDataRef.current = [];
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
 
-  // Update black hole size and camera min distance
   useEffect(() => {
     if (blackHoleRef.current) {
       blackHoleRef.current.geometry.dispose(); 
@@ -246,20 +280,18 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     }
   }, [blackHoleRadius]);
 
-  // Regenerate accretion disk particles when radii change
   useEffect(() => {
     if (sceneRef.current) {
        createAndAddAccretionParticles(
         sceneRef.current,
         accretionDiskInnerRadius,
         accretionDiskOuterRadius,
-        accretionDiskOpacity // Pass current opacity to maintain it
+        accretionDiskOpacity
       );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accretionDiskInnerRadius, accretionDiskOuterRadius]); // blackHoleRadius removed as it doesn't directly define particle distribution here
+  }, [accretionDiskInnerRadius, accretionDiskOuterRadius]); 
 
-  // Update accretion disk opacity
   useEffect(() => {
     if (accretionDiskRef.current && accretionDiskRef.current.material instanceof THREE.PointsMaterial) {
       accretionDiskRef.current.material.opacity = accretionDiskOpacity;
@@ -271,3 +303,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
+
