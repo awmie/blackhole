@@ -41,38 +41,53 @@ const blackHoleFragmentShader = `
 varying vec3 v_worldPosition;
 varying vec3 v_normal;
 uniform float u_time;
-uniform vec3 u_cameraPosition; // Explicitly declare if cameraPosition built-in is problematic
+// cameraPosition is a built-in uniform from Three.js
 
 // Simple procedural noise function (hash)
 float simpleNoise(vec2 st) {
     return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
 }
 
+// More complex noise for swirly patterns (Fractional Brownian Motion)
+float fbm(vec2 st) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    // frequency can be left out or initialized if used, but not strictly needed for this fbm
+    for (int i = 0; i < 4; i++) { // 4 octaves
+        value += amplitude * simpleNoise(st);
+        st *= 2.0; // Double the frequency
+        amplitude *= 0.5; // Halve the amplitude
+    }
+    return value;
+}
+
 void main() {
   vec3 normal = normalize(v_normal);
-  // Use u_cameraPosition if built-in cameraPosition is not working as expected in varying
-  // For now, assuming cameraPosition (built-in) can be used directly or passed if needed.
-  // If using an explicit uniform: vec3 viewDir = normalize(u_cameraPosition - v_worldPosition);
   vec3 viewDir = normalize(cameraPosition - v_worldPosition);
 
-
   // Fresnel effect: stronger at glancing angles (edges of the sphere)
-  float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 3.0); // Power controls sharpness of edge
+  // Increased power for sharper edge, and overall intensity boost
+  float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 5.0) * 1.5; 
+  fresnel = clamp(fresnel, 0.0, 1.0);
 
-  // Animated procedural noise for distortion effect
-  vec2 noiseCoordBase = v_worldPosition.xy * 0.4 + u_time * 0.03;
-  float noiseVal = simpleNoise(noiseCoordBase + simpleNoise(noiseCoordBase * 1.5 + u_time * 0.015)); // Layered noise
-  noiseVal = smoothstep(0.25, 0.75, noiseVal); // Smooth the noise
+  // Animated procedural noise for distortion/swirl effect
+  vec2 noiseCoordBase = v_worldPosition.xz * 0.8 + u_time * 0.05; // Swirl on XZ plane
+  noiseCoordBase.x += sin(v_worldPosition.y * 5.0 + u_time * 0.1) * 0.2; // Add some vertical waviness
+
+  float noiseVal = fbm(noiseCoordBase); // Use fractional Brownian motion for more detail
+  noiseVal = smoothstep(0.3, 0.7, noiseVal); // Adjust smoothing
 
   // Base color is black
   vec3 color = vec3(0.0, 0.0, 0.0);
 
-  // Lensed light color (e.g., a dim, desaturated blue/purple or whitish)
-  vec3 lensedLightColor = vec3(0.3, 0.3, 0.6); 
-  
+  // Lensed light color - bright, inspired by inner accretion disk
+  vec3 lensedLightColor = vec3(1.0, 0.7, 0.9); // Bright pinkish-white
+
   // Mix the black color with the lensed light color based on fresnel and noise
-  // This effect should be subtle and mostly at the edges.
-  color = mix(color, lensedLightColor, fresnel * noiseVal * 0.4); 
+  // Increased intensity of the effect
+  float effectIntensity = fresnel * noiseVal * 1.5; // Increased base intensity
+  
+  color = mix(color, lensedLightColor, clamp(effectIntensity, 0.0, 0.85)); // Clamp to allow strong glow
 
   gl_FragColor = vec4(color, 1.0);
 }
@@ -124,8 +139,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     const colorOuter = new THREE.Color(0.2, 0.1, 0.7); 
     const colorPhotonRing = new THREE.Color(1.0, 0.95, 0.85); 
 
-    const baseAngularSpeed = 0.4; 
-    const minAngularSpeedFactor = 0.05; 
+    const baseAngularSpeed = 0.2; 
+    const minAngularSpeedFactor = 0.02; 
     const outerFadeStartNormalized = 0.7; 
 
     for (let i = 0; i < NUM_PARTICLES; i++) {
@@ -138,12 +153,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       let normalizedDist = (radius - innerR) / (outerR - innerR);
       normalizedDist = Math.max(0, Math.min(1, normalizedDist));
 
-      const keplerianFactor = Math.pow(innerR / radius, 2.0);
+      const keplerianFactor = Math.pow(innerR / radius, 2.0); // More aggressive speed increase closer in
       let angularVelocity = baseAngularSpeed * keplerianFactor;
 
       const photonRingThreshold = 0.03;
       if (normalizedDist < photonRingThreshold) {
-        angularVelocity *= 5.0;
+        angularVelocity *= 5.0; // Further accelerate particles in the "photon ring"
       }
       
       angularVelocity = Math.max(angularVelocity, baseAngularSpeed * minAngularSpeedFactor);
@@ -225,7 +240,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       0.1,
       1000
     );
-    camera.position.set(0, blackHoleRadius * 2, blackHoleRadius * 5);
+    camera.position.set(0, blackHoleRadius * 1.5, blackHoleRadius * 4); // Adjusted camera position
     cameraRef.current = camera;
     onCameraUpdate({ x: camera.position.x, y: camera.position.y, z: camera.position.z });
 
@@ -239,7 +254,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
-    controls.minDistance = blackHoleRadius * 1.5;
+    controls.minDistance = blackHoleRadius * 1.2; // Closer min distance
     controls.maxDistance = 500;
     controlsRef.current = controls;
     
@@ -249,8 +264,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       }
     });
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); 
-    scene.add(ambientLight);
+    // No ambient or point light needed as shader handles illumination/emission
+    // const ambientLight = new THREE.AmbientLight(0xffffff, 0.1); 
+    // scene.add(ambientLight);
 
     const blackHoleGeometry = new THREE.SphereGeometry(blackHoleRadius, 64, 64);
     const blackHoleMaterial = new THREE.ShaderMaterial({
@@ -258,9 +274,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       fragmentShader: blackHoleFragmentShader,
       uniforms: {
         u_time: { value: 0.0 },
-        // u_cameraPosition: { value: camera.position } // Pass camera position if needed explicitly
+        // cameraPosition is usually provided by Three.js automatically
       },
-      transparent: false, // Black hole is opaque
+      transparent: false, 
     });
     const blackHole = new THREE.Mesh(blackHoleGeometry, blackHoleMaterial);
     scene.add(blackHole);
@@ -270,8 +286,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     
     const starsGeometry = new THREE.BufferGeometry();
     const starVertices = [];
-    for (let i = 0; i < 60000; i++) { 
-        const r = 100 + Math.random() * 400; 
+    for (let i = 0; i < 75000; i++) { // Increased star count
+        const r = 150 + Math.random() * 500; 
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
         const x = r * Math.sin(theta) * Math.cos(phi);
@@ -280,7 +296,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         starVertices.push(x, y, z);
     }
     starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.6, sizeAttenuation: true }); 
+    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.7, sizeAttenuation: true }); 
     const stars = new THREE.Points(starsGeometry, starsMaterial);
     scene.add(stars);
     starsRef.current = stars;
@@ -294,10 +310,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
       if (blackHoleRef.current && blackHoleRef.current.material instanceof THREE.ShaderMaterial) {
         blackHoleRef.current.material.uniforms.u_time.value = elapsedTime;
-        // If u_cameraPosition uniform is used:
-        // if (cameraRef.current) {
-        //   blackHoleRef.current.material.uniforms.u_cameraPosition.value.copy(cameraRef.current.position);
-        // }
       }
 
       if (accretionDiskRef.current && accretionDiskRef.current.geometry) {
@@ -310,6 +322,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
           const i3 = i * 3;
           positions[i3] = pData.radius * Math.cos(pData.angle);
+          // positions[i3 + 1] stays pData.yOffset
           positions[i3 + 2] = pData.radius * Math.sin(pData.angle);
         }
         accretionDiskRef.current.geometry.attributes.position.needsUpdate = true;
@@ -341,8 +354,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
           object.geometry?.dispose();
            if (Array.isArray(object.material)) {
             object.material.forEach(mat => mat.dispose());
-          } else {
-            (object.material as THREE.Material)?.dispose();
+          } else if (object.material) {
+            (object.material as THREE.Material).dispose();
           }
         }
       });
@@ -350,8 +363,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
          accretionDiskRef.current.geometry?.dispose();
          if (Array.isArray(accretionDiskRef.current.material)) {
             accretionDiskRef.current.material.forEach(m => m.dispose());
-         } else {
-            (accretionDiskRef.current.material as THREE.Material)?.dispose();
+         } else if (accretionDiskRef.current.material) {
+            (accretionDiskRef.current.material as THREE.Material).dispose();
          }
       }
       controlsRef.current?.dispose();
@@ -366,9 +379,14 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       blackHoleRef.current.geometry = new THREE.SphereGeometry(blackHoleRadius, 64, 64);
     }
     if (controlsRef.current) {
-        controlsRef.current.minDistance = blackHoleRadius * 1.5;
+        controlsRef.current.minDistance = blackHoleRadius * 1.2;
     }
-  }, [blackHoleRadius]);
+     if (cameraRef.current && cameraRef.current.position.length() < blackHoleRadius * 1.2) {
+        const newPos = cameraRef.current.position.clone().normalize().multiplyScalar(blackHoleRadius * 1.2);
+        cameraRef.current.position.copy(newPos);
+        onCameraUpdate({x: newPos.x, y: newPos.y, z:newPos.z});
+    }
+  }, [blackHoleRadius, onCameraUpdate]);
 
   useEffect(() => {
     if (sceneRef.current) {
@@ -393,3 +411,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
+
