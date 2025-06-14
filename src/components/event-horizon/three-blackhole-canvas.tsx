@@ -277,7 +277,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colorsAttribute, 3));
     
     jetMaterialRef.current = new THREE.PointsMaterial({
-        size: 0.05,
+        size: 0.05, // Jet particles can be slightly larger
         vertexColors: true,
         transparent: true,
         blending: THREE.AdditiveBlending,
@@ -395,7 +395,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouse, cameraRef.current);
 
-      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Spawning on Y=0 plane
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); 
       const intersectionPoint = new THREE.Vector3();
 
       if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
@@ -448,12 +448,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         if (planet.isStretching || planet.timeToLive < 10) { 
             currentOrbitRadius -= pullInFactor * blackHoleRadius * deltaTime * (10 / Math.max(1, planet.timeToLive));
             currentOrbitRadius = Math.max(currentOrbitRadius, blackHoleRadius * 0.5); 
-        }
-        // Update planet orbitRadius in state if it changes due to pull-in
-        if (currentOrbitRadius !== planet.orbitRadius) {
-            // This is tricky because this component shouldn't directly modify parent state's internals.
-            // For now, this is a local simulation change. A more robust way would be to send updates up.
-            planet.orbitRadius = currentOrbitRadius;
+            planet.orbitRadius = currentOrbitRadius; // Update the state's orbitRadius for next frame
         }
 
 
@@ -467,7 +462,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         if (distanceToCenterSq < blackHoleRadiusSq * 1.5 * 1.5 && !planet.isStretching) { 
             planet.isStretching = true;
             const radialDir = new THREE.Vector3(x, planet.yOffset, z).normalize();
-            // Ensure stretchAxis is based on direction towards black hole (origin)
             planet.stretchAxis = {x: -radialDir.x, y: -radialDir.y, z: -radialDir.z };
         }
         
@@ -475,18 +469,18 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             const stretchFactor = Math.min(5, 1 + (blackHoleRadiusSq / Math.max(distanceToCenterSq, 0.01)) * 2); 
             const squashFactor = 1 / Math.sqrt(stretchFactor); 
 
-            const axis = new THREE.Vector3(planet.stretchAxis.x, planet.stretchAxis.y, planet.stretchAxis.z).normalize();
-            const perpendicular1 = new THREE.Vector3().crossVectors(axis, new THREE.Vector3(0,1,0)).normalize();
-            if (perpendicular1.lengthSq() < 0.01) perpendicular1.crossVectors(axis, new THREE.Vector3(1,0,0)).normalize();
-            const perpendicular2 = new THREE.Vector3().crossVectors(axis, perpendicular1).normalize();
-            
             mesh.scale.set(
                 planet.initialScale.x * squashFactor, 
                 planet.initialScale.y * squashFactor, 
                 planet.initialScale.z * squashFactor 
             );
-            // Apply stretch along the dominant component of stretchAxis relative to world axes
-            // This is a simplification. True spaghettification aligns with the tidal forces vector.
+            
+            // Simplified stretch alignment - prioritize radial stretch towards black hole (origin)
+            const toOrigin = mesh.position.clone().normalize().multiplyScalar(-1); // Vector pointing towards black hole
+            const currentUp = new THREE.Vector3(0,1,0);
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(currentUp, toOrigin);
+            mesh.quaternion.slerp(quaternion, 0.1); // Smoothly align to stretch axis
+
             if (Math.abs(planet.stretchAxis.x) > Math.abs(planet.stretchAxis.y) && Math.abs(planet.stretchAxis.x) > Math.abs(planet.stretchAxis.z)) {
                  mesh.scale.x *= stretchFactor / squashFactor;
             } else if (Math.abs(planet.stretchAxis.y) > Math.abs(planet.stretchAxis.z)) {
@@ -494,6 +488,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             } else {
                  mesh.scale.z *= stretchFactor / squashFactor;
             }
+
 
         } else {
             mesh.scale.set(planet.currentScale.x, planet.currentScale.y, planet.currentScale.z);
@@ -514,7 +509,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             jetParticleDataRef.current.forEach((p, i) => {
                 if (p.life > 0) {
                     p.position.addScaledVector(p.velocity, deltaTime);
-                    p.life -= deltaTime / p.initialLife; // Life decreases relative to its initial life
+                    p.life -= deltaTime / p.initialLife; 
                     
                     positions[i * 3] = p.position.x;
                     positions[i * 3 + 1] = p.position.y;
@@ -530,19 +525,19 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     p.position.set(0, direction * blackHoleRadius * 1.1, 0); 
                     
                     const spreadAngle = Math.PI / 8; 
-                    const coneAngle = Math.random() * Math.PI * 2; // Angle around the jet axis
-                    const elevationAngle = (Math.random() * spreadAngle) - (spreadAngle / 2); // Angle from the jet axis
+                    const coneAngle = Math.random() * Math.PI * 2; 
+                    const elevationAngle = (Math.random() * spreadAngle) - (spreadAngle / 2); 
 
                     const jetAxis = new THREE.Vector3(0, direction, 0);
                     p.velocity.set(
                         Math.sin(elevationAngle) * Math.cos(coneAngle),
-                        Math.cos(elevationAngle) * direction, // Ensure main direction is up/down
+                        Math.cos(elevationAngle) * direction, 
                         Math.sin(elevationAngle) * Math.sin(coneAngle)
                     ).normalize().multiplyScalar(JET_SPEED * (0.8 + Math.random() * 0.4));
                     
-                    p.life = 1.0; // Reset life to full
-                    p.initialLife = JET_LIFESPAN * (0.7 + Math.random() * 0.6); // Store initial life for consistent fade
-                    p.color.setHSL(Math.random() * 0.1 + 0.55, 0.9, 0.7); 
+                    p.life = 1.0; 
+                    p.initialLife = JET_LIFESPAN * (0.7 + Math.random() * 0.6); 
+                    p.color.setHSL(Math.random() * 0.1 + 0.55, 0.9, 0.7); // Bright, star-like colors for jets
                     activeJets = true;
                 } else {
                     positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0; 
@@ -606,7 +601,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       diskParticleDataRef.current = [];
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onShiftClickSpawnAtPoint]); // Added onShiftClickSpawnAtPoint to dependency array
+  }, [onShiftClickSpawnAtPoint]); 
 
   useEffect(() => {
     if (blackHoleRef.current) {
@@ -652,21 +647,29 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     spawnedPlanets.forEach(planet => {
       if (!planetMeshesRef.current.has(planet.id)) {
-        const geometry = new THREE.SphereGeometry(1, 16, 16); 
-        const material = new THREE.MeshStandardMaterial({ color: planet.color, roughness: 0.5, metalness: 0.1 });
+        const geometry = new THREE.SphereGeometry(1, 16, 16); // Unit sphere
+        let material;
+        if (planet.type === 'star') {
+          material = new THREE.MeshBasicMaterial({ color: planet.color });
+        } else {
+          material = new THREE.MeshStandardMaterial({ color: planet.color, roughness: 0.5, metalness: 0.1 });
+        }
         const mesh = new THREE.Mesh(geometry, material);
         mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
         scene.add(mesh);
         planetMeshesRef.current.set(planet.id, mesh);
       } else {
-        
         const mesh = planetMeshesRef.current.get(planet.id);
-        if (mesh && mesh.material instanceof THREE.MeshStandardMaterial) {
-            if (mesh.material.color.getHexString() !== planet.color.substring(1) && planet.type === 'planet') { 
-                 mesh.material.color.set(planet.color);
+        if (mesh) {
+            if (planet.type === 'planet' && mesh.material instanceof THREE.MeshStandardMaterial) {
+                if (mesh.material.color.getHexString() !== planet.color.substring(1)) { 
+                     mesh.material.color.set(planet.color);
+                }
+            } else if (planet.type === 'star' && mesh.material instanceof THREE.MeshBasicMaterial) {
+                 if (mesh.material.color.getHexString() !== planet.color.substring(1)) {
+                    mesh.material.color.set(planet.color);
+                 }
             }
-            
-            // Current scale is updated within the animation loop if stretching
         }
       }
     });

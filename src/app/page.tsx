@@ -44,6 +44,9 @@ const ControlPanelSkeleton = () => (
 
 const HAWKING_RADIATION_THRESHOLD = 3;
 const HAWKING_RADIATION_DURATION = 5000; 
+const SPAWNED_OBJECT_BASE_SPEED = 1.0; // Base speed for spawned objects
+const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02; // Min speed factor for spawned objects
+const SPAWNED_OBJECT_SPEED_SCALAR = 0.75; // Make objects slightly slower than disk particles
 
 export default function Home() {
   const [blackHoleRadius, setBlackHoleRadius] = useState(1);
@@ -60,8 +63,6 @@ export default function Home() {
 
   const [selectedObjectType, setSelectedObjectType] = useState<'planet' | 'star'>('planet');
   
-  // simulationCamera state is kept for potential future use or if ControlPanel needs direct camera object.
-  // For shift-click spawning, ThreeBlackholeCanvas now uses its internal camera.
   const [, setSimulationCamera] = useState<THREE.PerspectiveCamera | null>(null);
 
 
@@ -99,24 +100,25 @@ export default function Home() {
     const id = nextObjectId;
     setNextObjectId(prev => prev + 1);
     
-    let orbitRadius, currentAngle, yOffset;
+    let objectOrbitRadius, currentAngle, yOffset;
 
     if (clickPosition) {
-      orbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
+      objectOrbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
       currentAngle = Math.atan2(clickPosition.z, clickPosition.x);
       yOffset = clickPosition.y; 
+      // Ensure spawned objects are not too close to the black hole initially if clicked too close
+      objectOrbitRadius = Math.max(objectOrbitRadius, blackHoleRadius + 0.5);
     } else {
-      orbitRadius = accretionDiskInnerRadius + (accretionDiskOuterRadius - accretionDiskInnerRadius) * (0.2 + Math.random() * 0.8);
+      objectOrbitRadius = accretionDiskInnerRadius + (accretionDiskOuterRadius - accretionDiskInnerRadius) * (0.2 + Math.random() * 0.8);
       currentAngle = Math.random() * Math.PI * 2;
-      yOffset = (Math.random() - 0.5) * 0.1;
+      yOffset = (Math.random() - 0.5) * 0.1; // Keep yOffset small for objects
     }
     
-    const baseSpeed = 1.0; 
-    const minSpeedFactor = 0.02;
-    
-    let angularVelocity = baseSpeed * Math.pow(accretionDiskInnerRadius / orbitRadius, 2.5);
-    angularVelocity = Math.max(angularVelocity, baseSpeed * minSpeedFactor) * (Math.random() > 0.5 ? 1 : -1);
-
+    // Calculate angular velocity based on orbitRadius, similar to accretion disk particles
+    let angularVelocity = SPAWNED_OBJECT_BASE_SPEED * Math.pow(accretionDiskInnerRadius / objectOrbitRadius, 2.5);
+    angularVelocity = Math.max(angularVelocity, SPAWNED_OBJECT_BASE_SPEED * SPAWNED_OBJECT_MIN_SPEED_FACTOR);
+    angularVelocity *= (Math.random() > 0.5 ? 1 : -1); // Random direction
+    angularVelocity *= SPAWNED_OBJECT_SPEED_SCALAR; // Scale speed
 
     let color, initialScale;
     if (selectedObjectType === 'star') {
@@ -130,9 +132,9 @@ export default function Home() {
     const newObject: PlanetState = {
       id,
       type: selectedObjectType,
-      orbitRadius,
+      orbitRadius: objectOrbitRadius,
       currentAngle,
-      angularVelocity: angularVelocity * 0.5, 
+      angularVelocity: angularVelocity, 
       yOffset,
       color,
       initialScale,
@@ -143,7 +145,7 @@ export default function Home() {
       progressValue: 0,
     };
     setSpawnedObjects(prev => [...prev, newObject]);
-  }, [nextObjectId, accretionDiskOuterRadius, accretionDiskInnerRadius, selectedObjectType]);
+  }, [nextObjectId, blackHoleRadius, accretionDiskOuterRadius, accretionDiskInnerRadius, selectedObjectType]);
 
   const handleAbsorbObject = useCallback((objectId: number) => {
     setSpawnedObjects(prev => prev.filter(p => p.id !== objectId));
