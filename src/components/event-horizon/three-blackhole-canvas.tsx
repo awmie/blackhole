@@ -5,7 +5,6 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import type * as THREE_TYPE from 'three';
 import type { OrbitControls as OrbitControlsType } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { PlanetState } from '@/app/page';
-// lensing-shader.ts is removed, effect integrated into blackHole shaders below
 
 export interface JetParticleState {
   id: number;
@@ -98,7 +97,9 @@ uniform sampler2D u_starfieldTexture; // Texture of the rendered starfield
 uniform vec2 u_resolution;           // Screen resolution for aspect ratio
 uniform float u_lensingStrength;     // Strength of the lensing effect
 uniform mat4 u_bhModelMatrix;       // Black hole's model matrix (world transform)
-// projectionMatrix and viewMatrix are typically built-in
+uniform mat4 projectionMatrix;      // Explicitly declare projectionMatrix
+
+// viewMatrix is assumed to be available as a built-in/implicitly by Three.js
 
 
 float simpleNoise(vec2 st) {
@@ -517,7 +518,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
   useEffect(() => {
     const foregroundScene = foregroundSceneRef.current;
-    if (!foregroundScene || !THREEInstanceRef.current) return; // backgroundScene no longer strictly needed here if stars only go to RT
+    if (!foregroundScene || !THREEInstanceRef.current) return; 
 
     initJetParticles();
     initStarEmittedParticles();
@@ -601,10 +602,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       uniforms: {
         u_time: { value: 0.0 },
         u_cameraPosition: { value: camera.position },
-        u_starfieldTexture: { value: null }, // Will be starfieldRenderTargetRef.texture
+        u_starfieldTexture: { value: null }, 
         u_resolution: { value: new THREE.Vector2(mountRef.current.clientWidth, mountRef.current.clientHeight) },
-        u_lensingStrength: { value: 0.05 }, // Initial lensing strength
-        u_bhModelMatrix: { value: new THREE.Matrix4() } // Will be blackHoleRef.current.matrixWorld
+        u_lensingStrength: { value: 0.05 }, 
+        u_bhModelMatrix: { value: new THREE.Matrix4() } 
       },
     });
     const blackHoleMesh = new THREE.Mesh(blackHoleGeometry, blackHoleMaterialRef.current);
@@ -615,7 +616,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     const starsGeometry = new THREE.BufferGeometry();
     const starVertices = [];
-    for (let i = 0; i < 150000; i++) { // Keep a dense starfield for good texture
+    for (let i = 0; i < 150000; i++) { 
         const r = 200 + Math.random() * 600; 
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
@@ -624,7 +625,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
     const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.9, sizeAttenuation: true });
     starsRef.current = new THREE.Points(starsGeometry, starsMaterial);
-    backgroundSceneRef.current.add(starsRef.current); // Stars go into background scene for RT
+    backgroundSceneRef.current.add(starsRef.current); 
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     foregroundSceneRef.current.add(ambientLight);
@@ -673,7 +674,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       const THREE_ANIM = THREEInstanceRef.current;
       const renderer_anim = rendererRef.current;
       const fgScene_anim = foregroundSceneRef.current;
-      const bgScene_anim = backgroundSceneRef.current; // For starfield RT
+      const bgScene_anim = backgroundSceneRef.current; 
       const mainCam_anim = cameraRef.current;
       const starRT_anim = starfieldRenderTargetRef.current;
       const bhMaterial_anim = blackHoleMaterialRef.current;
@@ -686,12 +687,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
       controlsRef.current?.update();
 
-      // Update black hole shader uniforms related to time and camera
+      
       bhMaterial_anim.uniforms.u_time.value = elapsedTime;
       bhMaterial_anim.uniforms.u_cameraPosition.value.copy(mainCam_anim.position);
       bhMaterial_anim.uniforms.u_resolution.value.set(renderer_anim.domElement.width, renderer_anim.domElement.height);
       bhMaterial_anim.uniforms.u_bhModelMatrix.value.copy(bh_anim.matrixWorld);
-      // u_starfieldTexture will be updated after rendering to starRT_anim
+      
 
       if (accretionDiskRef.current?.geometry) {
         const positions = accretionDiskRef.current.geometry.attributes.position.array as Float32Array;
@@ -939,19 +940,19 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             }
         }
 
-      // Pass 1: Render starfield to starfieldRenderTarget
-      if (starsRef.current) starsRef.current.visible = true; // Ensure stars are visible for this pass
+      
+      if (starsRef.current) starsRef.current.visible = true; 
       renderer_anim.setRenderTarget(starRT_anim);
       renderer_anim.clear();
       renderer_anim.render(bgScene_anim, mainCam_anim);
       renderer_anim.setRenderTarget(null);
-      if (starsRef.current) starsRef.current.visible = true; // Keep stars visible if they are part of fgScene_anim as well (they are not currently)
+      if (starsRef.current) starsRef.current.visible = true; 
 
-      // Update black hole material with the rendered starfield texture
+      
       bhMaterial_anim.uniforms.u_starfieldTexture.value = starRT_anim.texture;
       
-      // Pass 2: Render foreground scene (including black hole with lensing) to screen
-      renderer_anim.clear(); // Clear color and depth for the main scene
+      
+      renderer_anim.clear(); 
       renderer_anim.render(fgScene_anim, mainCam_anim);
 
     };
@@ -1019,7 +1020,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       }
 
       starfieldRenderTargetRef.current?.dispose();
-      // Lensing quad and material are removed, no need to dispose
+      
 
 
       foregroundSceneRef.current?.traverse(object => {
