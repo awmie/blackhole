@@ -37,7 +37,7 @@ export const lensingShader = {
       vec2 distortedUv = uBlackHolePos + dir * lensedDist / vec2(uAspectRatio, 1.0);
 
       // Clamp distortedUv to avoid texture wrapping issues if distortion is too strong
-      // distortedUv = clamp(distortedUv, vec2(0.0), vec2(1.0));
+      distortedUv = clamp(distortedUv, vec2(0.0), vec2(1.0));
       
       gl_FragColor = texture2D(uTexture, distortedUv);
     }
