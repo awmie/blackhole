@@ -188,6 +188,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     outerR: number,
     opacity: number
   ) => {
+    const THREE = require('three');
+    if (!THREE) return;
+
     if (accretionDiskRef.current) {
       scene.remove(accretionDiskRef.current);
       accretionDiskRef.current.geometry.dispose();
@@ -279,6 +282,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   }, []);
 
   const initJetParticles = useCallback((scene: THREE.Scene) => {
+    const THREE = require('three');
+    if (!THREE) return;
+    
     if (jetParticlesRef.current) {
         scene.remove(jetParticlesRef.current);
         jetParticlesRef.current.geometry.dispose();
@@ -335,13 +341,15 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     initJetParticles(scene);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rendererRef.current]); 
+  }, [rendererRef.current]); // Dependency on rendererRef.current ensures it runs once renderer is ready
 
 
   useEffect(() => {
     if (!mountRef.current) return;
 
-    const THREE = require('three'); // Dynamically require THREE here
+    const THREE = require('three'); 
+    if (!THREE) return;
+
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
@@ -449,7 +457,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     let animationFrameId: number;
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
-      if (!clockRef.current || !THREE) return; // Guard against clock not being initialized
+      if (!clockRef.current || !THREE) return; 
 
       const deltaTime = clockRef.current.getDelta();
       const elapsedTime = clockRef.current.getElapsedTime();
@@ -520,9 +528,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             } else if (currentPosition.length() < blackHoleActualRadius * 0.9 || currentPlanetTimeToLive <= 0) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
             } else {
-                if (currentPlanetTimeToLive < 10) { 
+                 if (currentPlanetTimeToLive < 10) {
                      currentPlanetOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, currentPlanetTimeToLive)) * 0.05;
-                }
+                 }
                 currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * (DISSOLUTION_START_RADIUS_FACTOR - 0.01) );
             }
         }
@@ -679,7 +687,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
-    const THREE = require('three'); // Dynamically require THREE here for mesh management
+    const THREE = require('three'); 
+    if (!THREE) return;
 
 
     const currentPlanetMeshMap = planetMeshesRef.current; 
