@@ -127,7 +127,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   accretionDiskOuterRadius,
   accretionDiskOpacity,
   onCameraUpdate,
-  spawnedPlanets, // Prop from page.tsx
+  spawnedPlanets, 
   onAbsorbPlanet,
   onSetPlanetDissolving,
   isEmittingJets,
@@ -145,7 +145,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   const accretionDiskRef = useRef<THREE.Points | null>(null);
   const starsRef = useRef<THREE.Points | null>(null);
 
-  const clockRef = useRef<THREE.Clock>(new THREE.Clock());
+  const clockRef = useRef<THREE.Clock | null>(null);
   const diskParticleDataRef = useRef<DiskParticleData[]>([]);
   const planetMeshesRef = useRef<Map<number, THREE.Mesh>>(new Map());
   const dissolvingObjectsProgressRef = useRef<Map<number, number>>(new Map());
@@ -155,12 +155,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   const jetParticleDataRef = useRef<JetParticleState[]>([]);
   const jetMaterialRef = useRef<THREE.PointsMaterial | null>(null);
 
-  // Refs for callbacks to avoid re-triggering main useEffect
   const onShiftClickSpawnAtPointRef = useRef(onShiftClickSpawnAtPoint);
   const onCameraUpdateRef = useRef(onCameraUpdate);
   const onAbsorbPlanetRef = useRef(onAbsorbPlanet);
   const onSetPlanetDissolvingRef = useRef(onSetPlanetDissolving);
-  const spawnedPlanetsRef = useRef(spawnedPlanets); // Ref to hold current planets
+  const spawnedPlanetsRef = useRef(spawnedPlanets); 
 
   useEffect(() => {
     spawnedPlanetsRef.current = spawnedPlanets;
@@ -342,9 +341,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   useEffect(() => {
     if (!mountRef.current) return;
 
+    const THREE = require('three'); // Dynamically require THREE here
+
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     clockRef.current = new THREE.Clock();
+
 
     const camera = new THREE.PerspectiveCamera(
       75,
@@ -421,7 +423,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     const currentRendererDomElement = renderer.domElement;
     const handleCanvasShiftClick = (event: PointerEvent) => {
-      if (!event.shiftKey || !cameraRef.current || !onShiftClickSpawnAtPointRef.current) return;
+      if (!event.shiftKey || !cameraRef.current || !onShiftClickSpawnAtPointRef.current || !THREE) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -447,6 +449,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     let animationFrameId: number;
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
+      if (!clockRef.current || !THREE) return; // Guard against clock not being initialized
+
       const deltaTime = clockRef.current.getDelta();
       const elapsedTime = clockRef.current.getElapsedTime();
 
@@ -474,12 +478,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       
       spawnedPlanetsRef.current.forEach(planet => {
         const mesh = planetMeshesRef.current.get(planet.id);
-        if (!mesh) return;
+        if (!mesh || !THREE) return;
 
-        let currentPlanetOrbitRadius = planet.orbitRadius; // Use prop orbitRadius for calculations
+        let currentPlanetOrbitRadius = planet.orbitRadius; 
         let currentPlanetAngle = planet.currentAngle + planet.angularVelocity * deltaTime;
-        let currentPlanetTimeToLive = planet.timeToLive - deltaTime; // Simulate TTL locally
-        const blackHoleActualRadius = blackHoleRadius; // Use prop directly
+        let currentPlanetTimeToLive = planet.timeToLive - deltaTime; 
+        const blackHoleActualRadius = blackHoleRadius; 
 
         if (planet.isDissolving) {
             let progress = dissolvingObjectsProgressRef.current.get(planet.id) || 0;
@@ -500,10 +504,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             if (progress >= 1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
             }
-        } else { // NOT DISSOLVING
-            // Explicitly set to initial scale if not dissolving. Stretching logic is removed for now to ensure no shrinking.
+        } else { 
             mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
-            mesh.quaternion.slerp(new THREE.Quaternion(), 0.1); // Reset rotation
+            mesh.quaternion.slerp(new THREE.Quaternion(), 0.1); 
 
             const currentPosition = new THREE.Vector3(
               currentPlanetOrbitRadius * Math.cos(currentPlanetAngle),
@@ -517,10 +520,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             } else if (currentPosition.length() < blackHoleActualRadius * 0.9 || currentPlanetTimeToLive <= 0) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
             } else {
-                if (currentPlanetTimeToLive < 10) { // Gentle pull-in only if TTL is low
+                if (currentPlanetTimeToLive < 10) { 
                      currentPlanetOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, currentPlanetTimeToLive)) * 0.05;
                 }
-                 // Prevent going too deep unless dissolving or being absorbed by TTL/direct hit
                 currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * (DISSOLUTION_START_RADIUS_FACTOR - 0.01) );
             }
         }
@@ -529,14 +531,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         const z = currentPlanetOrbitRadius * Math.sin(currentPlanetAngle);
         mesh.position.set(x, planet.yOffset, z);
 
-        // To correctly update the "true" state in page.tsx for orbitRadius, currentAngle, timeToLive,
-        // you would ideally call a batch update function here.
-        // For now, page.tsx's state for these only updates on major events.
-        // This animation loop uses locally simulated values for these visual properties.
       });
 
 
-        if (jetParticlesRef.current && jetMaterialRef.current && jetParticleDataRef.current.length > 0) {
+        if (jetParticlesRef.current && jetMaterialRef.current && jetParticleDataRef.current.length > 0 && THREE) {
             const positions = jetParticlesRef.current.geometry.attributes.position.array as Float32Array;
             const colorsAttribute = jetParticlesRef.current.geometry.attributes.color.array as Float32Array;
             let activeJets = false;
@@ -611,13 +609,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       planetMeshesRef.current.forEach(mesh => {
         mesh.geometry.dispose();
         (mesh.material as THREE.Material).dispose();
-        // scene.remove(mesh) is handled in the spawnedPlanets useEffect cleanup
       });
       planetMeshesRef.current.clear();
       dissolvingObjectsProgressRef.current.clear();
 
       if (jetParticlesRef.current) {
-        // scene.remove(jetParticlesRef.current) is implicitly handled by main scene cleanup
         jetParticlesRef.current.geometry.dispose();
         if (jetParticlesRef.current.material) { 
             (jetParticlesRef.current.material as THREE.Material).dispose();
@@ -680,19 +676,19 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accretionDiskOpacity, createAndAddAccretionParticles]); 
 
-  // Effect for managing planet meshes based on spawnedPlanets prop
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
+    const THREE = require('three'); // Dynamically require THREE here for mesh management
+
 
     const currentPlanetMeshMap = planetMeshesRef.current; 
     const newPlanetMeshMap = new Map<number, THREE.Mesh>();
 
-    // Iterate over the current 'spawnedPlanets' prop
     spawnedPlanets.forEach(planet => {
       let mesh = currentPlanetMeshMap.get(planet.id);
       
-      if (!mesh) { // New planet
+      if (!mesh) { 
         const geometry = new THREE.SphereGeometry(1, 16, 16);
         let material;
         if (planet.type === 'star') {
@@ -701,24 +697,22 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
           material = new THREE.MeshStandardMaterial({ color: planet.color, roughness: 0.5, metalness: 0.1 });
         }
         mesh = new THREE.Mesh(geometry, material);
-        mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z); // Set initial scale
+        mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z); 
         scene.add(mesh);
-      } else { // Existing planet, update material/color if needed
+      } else { 
         const expectedMaterialType = planet.type === 'star' ? THREE.MeshBasicMaterial : THREE.MeshStandardMaterial;
         if (!(mesh.material instanceof expectedMaterialType)) {
-           (mesh.material as THREE.Material).dispose(); // Dispose old material
+           (mesh.material as THREE.Material).dispose(); 
            if (planet.type === 'star') {
               mesh.material = new THREE.MeshBasicMaterial({ color: planet.color });
            } else {
               mesh.material = new THREE.MeshStandardMaterial({ color: planet.color, roughness: 0.5, metalness: 0.1 });
            }
         } else { 
-          // Only update color if it has changed
           if ((mesh.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.getHexString() !== new THREE.Color(planet.color).getHexString()) { 
               (mesh.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.set(planet.color);
           }
         }
-        // Ensure scale is reset if not dissolving (animate loop will handle dynamic scaling)
         if (!planet.isDissolving) {
            mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
         }
@@ -726,7 +720,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       newPlanetMeshMap.set(planet.id, mesh);
     });
 
-    // Remove meshes for planets that no longer exist in the prop
     currentPlanetMeshMap.forEach((mesh, id) => {
       if (!newPlanetMeshMap.has(id)) {
         scene.remove(mesh);
@@ -735,9 +728,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         dissolvingObjectsProgressRef.current.delete(id); 
       }
     });
-    planetMeshesRef.current = newPlanetMeshMap; // Update the ref to the new map
+    planetMeshesRef.current = newPlanetMeshMap; 
 
-  }, [spawnedPlanets, sceneRef]); // Dependency on spawnedPlanets (prop) and sceneRef
+  }, [spawnedPlanets, sceneRef]); 
 
 
   return <div ref={mountRef} className="w-full h-full outline-none" data-ai-hint="galaxy space" />;
