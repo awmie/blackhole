@@ -43,10 +43,13 @@ const ControlPanelSkeleton = () => (
 );
 
 const HAWKING_RADIATION_THRESHOLD = 3;
-const HAWKING_RADIATION_DURATION = 5000; 
-const SPAWNED_OBJECT_BASE_SPEED = 1.0; // Base speed for spawned objects
-const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02; // Min speed factor for spawned objects
-const SPAWNED_OBJECT_SPEED_SCALAR = 0.75; // Make objects slightly slower than disk particles
+const HAWKING_RADIATION_DURATION = 5000;
+const SPAWNED_OBJECT_BASE_SPEED = 1.0;
+const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02;
+const SPAWNED_OBJECT_SPEED_SCALAR = 0.75; // Make objects slightly slower than disk particles but in same direction
+const CLOSE_SPAWN_TIME_TO_LIVE = 3; // 3 seconds for objects spawned very close
+const CLOSE_SPAWN_RADIUS_FACTOR = 1.3; // Objects spawned within 1.3x BH radius are "close"
+
 
 export default function Home() {
   const [blackHoleRadius, setBlackHoleRadius] = useState(1);
@@ -62,7 +65,7 @@ export default function Home() {
   const [showControlsPanel, setShowControlsPanel] = useState(false);
 
   const [selectedObjectType, setSelectedObjectType] = useState<'planet' | 'star'>('planet');
-  
+
   const [, setSimulationCamera] = useState<THREE.PerspectiveCamera | null>(null);
 
 
@@ -89,7 +92,7 @@ export default function Home() {
       }
     }
   };
-  
+
   const handleAccretionDiskOuterRadiusChange = (value: number) => {
     if (value > accretionDiskInnerRadius) {
       setAccretionDiskOuterRadius(value);
@@ -99,47 +102,50 @@ export default function Home() {
   const handleSpawnObject = useCallback((clickPosition?: THREE.Vector3) => {
     const id = nextObjectId;
     setNextObjectId(prev => prev + 1);
-    
+
     let objectOrbitRadius, currentAngle, yOffset;
 
     if (clickPosition) {
       objectOrbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
       currentAngle = Math.atan2(clickPosition.z, clickPosition.x);
-      yOffset = clickPosition.y; 
-      // Ensure spawned objects are not too close to the black hole initially if clicked too close
-      objectOrbitRadius = Math.max(objectOrbitRadius, blackHoleRadius + 0.5);
+      yOffset = clickPosition.y;
+      objectOrbitRadius = Math.max(objectOrbitRadius, blackHoleRadius + 0.1); // Min spawn distance from BH edge
     } else {
       objectOrbitRadius = accretionDiskInnerRadius + (accretionDiskOuterRadius - accretionDiskInnerRadius) * (0.2 + Math.random() * 0.8);
       currentAngle = Math.random() * Math.PI * 2;
-      yOffset = (Math.random() - 0.5) * 0.1; // Keep yOffset small for objects
+      yOffset = (Math.random() - 0.5) * 0.1;
     }
-    
-    // Calculate angular velocity based on orbitRadius, similar to accretion disk particles
+
     let angularVelocity = SPAWNED_OBJECT_BASE_SPEED * Math.pow(accretionDiskInnerRadius / objectOrbitRadius, 2.5);
     angularVelocity = Math.max(angularVelocity, SPAWNED_OBJECT_BASE_SPEED * SPAWNED_OBJECT_MIN_SPEED_FACTOR);
-    angularVelocity *= (Math.random() > 0.5 ? 1 : -1); // Random direction
-    angularVelocity *= SPAWNED_OBJECT_SPEED_SCALAR; // Scale speed
+    angularVelocity *= SPAWNED_OBJECT_SPEED_SCALAR; // Ensures positive, same direction as disk, but scaled
 
     let color, initialScale;
     if (selectedObjectType === 'star') {
-      color = '#FFFF99'; 
+      color = '#FFFF99';
       initialScale = { x: 0.2, y: 0.2, z: 0.2 };
-    } else { 
+    } else {
       color = `hsl(${Math.random() * 360}, 70%, 60%)`;
       initialScale = { x: 0.1, y: 0.1, z: 0.1 };
     }
+    
+    let timeToLive = 60 + Math.random() * 60;
+    if (objectOrbitRadius < blackHoleRadius * CLOSE_SPAWN_RADIUS_FACTOR) {
+      timeToLive = CLOSE_SPAWN_TIME_TO_LIVE;
+    }
+
 
     const newObject: PlanetState = {
       id,
       type: selectedObjectType,
       orbitRadius: objectOrbitRadius,
       currentAngle,
-      angularVelocity: angularVelocity, 
+      angularVelocity: angularVelocity,
       yOffset,
       color,
       initialScale,
       currentScale: { ...initialScale },
-      timeToLive: 60 + Math.random() * 60,
+      timeToLive: timeToLive,
       isStretching: false,
       stretchAxis: { x: 0, y: 0, z: 1 },
       progressValue: 0,
@@ -184,7 +190,7 @@ export default function Home() {
               accretionDiskOpacity={accretionDiskOpacity}
               setAccretionDiskOpacity={setAccretionDiskOpacity}
               cameraPosition={cameraPosition}
-              onSpawnObjectClick={() => handleSpawnObject()} 
+              onSpawnObjectClick={() => handleSpawnObject()}
               selectedObjectType={selectedObjectType}
               setSelectedObjectType={setSelectedObjectType}
             />
