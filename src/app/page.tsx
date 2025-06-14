@@ -20,9 +20,6 @@ export interface PlanetState {
   color: string;
   initialScale: { x: number; y: number; z: number };
   timeToLive: number;
-  isStretching: boolean;
-  stretchAxis: { x: number; y: number; z: number };
-  progressValue: number;
   isDissolving: boolean;
 }
 
@@ -39,11 +36,12 @@ const ControlPanelSkeleton = () => (
     <Skeleton className="h-52 w-full rounded-lg bg-sidebar-accent/30" />
     <Skeleton className="h-24 w-full rounded-lg bg-sidebar-accent/30" />
     <Skeleton className="h-20 w-full rounded-lg bg-sidebar-accent/30" />
+     <Skeleton className="h-20 w-full rounded-lg bg-sidebar-accent/30" />
   </div>
 );
 
 const HAWKING_RADIATION_THRESHOLD = 3;
-const HAWKING_RADIATION_DURATION = 5000;
+const HAWKING_RADIATION_DURATION = 5000; // ms
 const SPAWNED_OBJECT_BASE_SPEED = 2.0;
 const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02;
 const SPAWNED_OBJECT_SPEED_SCALAR = 1.5; 
@@ -137,7 +135,6 @@ export default function Home() {
       timeToLive = CLOSE_SPAWN_TIME_TO_LIVE;
     }
 
-
     const newObject: PlanetState = {
       id,
       type: selectedObjectType,
@@ -148,25 +145,32 @@ export default function Home() {
       color,
       initialScale,
       timeToLive: timeToLive,
-      isStretching: false,
-      stretchAxis: { x: 0, y: 0, z: 1 },
-      progressValue: 0,
       isDissolving: false, 
     };
     setSpawnedObjects(prev => [...prev, newObject]);
   }, [nextObjectId, blackHoleRadius, accretionDiskOuterRadius, accretionDiskInnerRadius, selectedObjectType]);
+
+  const triggerJetEmission = useCallback(() => {
+    if (isEmittingJets) return; // Prevent re-triggering if already active
+    setIsEmittingJets(true);
+    setTimeout(() => setIsEmittingJets(false), HAWKING_RADIATION_DURATION);
+  }, [isEmittingJets]);
 
   const handleAbsorbObject = useCallback((objectId: number) => {
     setSpawnedObjects(prev => prev.filter(p => p.id !== objectId));
     setAbsorbedObjectCount(prev => {
       const newCount = prev + 1;
       if (newCount % HAWKING_RADIATION_THRESHOLD === 0 && newCount > 0) {
-        setIsEmittingJets(true);
-        setTimeout(() => setIsEmittingJets(false), HAWKING_RADIATION_DURATION);
+        triggerJetEmission();
       }
       return newCount;
     });
-  }, []);
+  }, [triggerJetEmission]);
+
+  const handleManualJetEmission = useCallback(() => {
+    triggerJetEmission();
+  }, [triggerJetEmission]);
+
 
   const handleSetPlanetDissolving = useCallback((objectId: number, dissolving: boolean) => {
     setSpawnedObjects(prevObjects => 
@@ -204,6 +208,7 @@ export default function Home() {
               onSpawnObjectClick={() => handleSpawnObject()}
               selectedObjectType={selectedObjectType}
               setSelectedObjectType={setSelectedObjectType}
+              onManualJetEmissionClick={handleManualJetEmission}
             />
           </SheetContent>
         </Sheet>

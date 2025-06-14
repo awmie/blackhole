@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sun, PanelLeftClose, PanelRightClose, Layers, Ruler, Move3d, Database, Atom } from 'lucide-react';
+import { Sun, PanelLeftClose, PanelRightClose, Layers, Ruler, Move3d, Database, Atom, Zap } from 'lucide-react';
 
 interface ControlPanelProps {
   blackHoleRadius: number;
@@ -21,9 +21,10 @@ interface ControlPanelProps {
   accretionDiskOpacity: number;
   setAccretionDiskOpacity: (value: number) => void;
   cameraPosition: { x: number; y: number; z: number };
-  onSpawnObjectClick: () => void; // Renamed from onSpawnPlanetClick
+  onSpawnObjectClick: () => void;
   selectedObjectType: 'planet' | 'star';
   setSelectedObjectType: (type: 'planet' | 'star') => void;
+  onManualJetEmissionClick: () => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -39,6 +40,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onSpawnObjectClick,
   selectedObjectType,
   setSelectedObjectType,
+  onManualJetEmissionClick,
 }) => {
   const calculatedSchwarzschildRadius = (blackHoleRadius * 0.25).toFixed(2);
 
@@ -119,7 +121,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         
         <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl font-headline flex items-center"><Atom className="mr-2 h-6 w-6 text-sidebar-primary" /> Object Controls</CardTitle>
+            <CardTitle className="text-xl font-headline flex items-center"><Atom className="mr-2 h-6 w-6 text-sidebar-primary" /> Object & Effects Controls</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -139,6 +141,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
             <Button onClick={onSpawnObjectClick} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
               <Atom className="mr-2 h-4 w-4" /> Spawn {selectedObjectType.charAt(0).toUpperCase() + selectedObjectType.slice(1)}
+            </Button>
+             <Button onClick={onManualJetEmissionClick} variant="outline" className="w-full">
+              <Zap className="mr-2 h-4 w-4" /> Trigger Hawking Radiation
             </Button>
             <p className="text-xs text-muted-foreground text-center">Shift-click on canvas to spawn at cursor. After {3} absorptions, Hawking radiation jets might appear briefly.</p>
           </CardContent>
