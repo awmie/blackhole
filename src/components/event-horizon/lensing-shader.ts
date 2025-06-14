@@ -32,8 +32,8 @@ export const lensingShader = {
 
       float intensity = 0.0;
       // Define the band where lensing occurs, relative to the black hole's screen radius
-      float bandOuterEdge = uBlackHoleScreenRadius * 1.3; 
-      float bandInnerEdge = uBlackHoleScreenRadius * 0.92; 
+      float bandOuterEdge = uBlackHoleScreenRadius * 1.15; 
+      float bandInnerEdge = uBlackHoleScreenRadius * 0.98; 
       
       // Intensity profile: peaks at uBlackHoleScreenRadius, fades to 0 towards bandInnerEdge and bandOuterEdge
       if (distFromCenter > bandInnerEdge && distFromCenter < uBlackHoleScreenRadius) {
@@ -64,3 +64,4 @@ export const lensingShader = {
     }
   `
 };
+
