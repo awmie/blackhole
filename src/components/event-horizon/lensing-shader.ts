@@ -32,8 +32,8 @@ export const lensingShader = {
 
       float intensity = 0.0;
       // Define the band where lensing occurs, relative to the black hole's screen radius
-      float bandOuterEdge = uBlackHoleScreenRadius * 1.01; // Further tightened outer falloff
-      float bandInnerEdge = uBlackHoleScreenRadius * 0.99; // Start effect very close to the edge
+      float bandInnerEdge = uBlackHoleScreenRadius * 0.98; // Start effect slightly inside the edge
+      float bandOuterEdge = uBlackHoleScreenRadius * 1.08; // Falloff extends a bit outside
       
       // Intensity profile: peaks at uBlackHoleScreenRadius, fades to 0 towards bandInnerEdge and bandOuterEdge
       if (distFromCenter > bandInnerEdge && distFromCenter < uBlackHoleScreenRadius) {
