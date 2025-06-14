@@ -36,10 +36,10 @@ const NUM_PARTICLES = 50000;
 const baseAngularSpeed = 1.0;
 const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
-const PULL_IN_FACTOR = 0.1;
+const PULL_IN_FACTOR = 0.1; 
 
-const DISSOLUTION_START_RADIUS_FACTOR = 1.1;
-const DISSOLUTION_DURATION = 1.5;
+const DISSOLUTION_START_RADIUS_FACTOR = 1.1; 
+const DISSOLUTION_DURATION = 1.5; 
 
 interface DiskParticleData {
   radius: number;
@@ -487,10 +487,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
         planet.currentAngle += planet.angularVelocity * deltaTime;
         planet.timeToLive -= deltaTime;
-
+        
         let currentOrbitRadius = planet.orbitRadius;
-        const distanceToCenterSq = mesh.position.lengthSq();
-        const blackHoleRadiusSq = blackHoleRadius * blackHoleRadius;
+        const blackHoleActualRadius = blackHoleRadius;
+
 
         if (planet.isDissolving) {
             let progress = dissolvingObjectsProgressRef.current.get(planet.id) || 0;
@@ -505,67 +505,61 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 planet.initialScale.z * scaleFactor
             );
             
-            currentOrbitRadius -= (PULL_IN_FACTOR * 2) * blackHoleRadius * deltaTime * progress; 
-            planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleRadius * 0.1); 
+            currentOrbitRadius -= (PULL_IN_FACTOR * 0.5) * blackHoleActualRadius * deltaTime * (0.2 + progress * 0.8);
+            planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleActualRadius * 0.1);
 
             if (progress >= 1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
-                dissolvingObjectsProgressRef.current.delete(planet.id);
                 return; 
             }
         } else {
-            if (planet.isStretching || planet.timeToLive < 10) { 
-                currentOrbitRadius -= PULL_IN_FACTOR * blackHoleRadius * deltaTime * (10 / Math.max(1, planet.timeToLive));
-                currentOrbitRadius = Math.max(currentOrbitRadius, blackHoleRadius * 0.5); 
-                planet.orbitRadius = currentOrbitRadius; 
+            // Not dissolving: check for starting dissolution or direct absorption
+            const distanceToCenterSq = mesh.position.lengthSq();
+            if (distanceToCenterSq < Math.pow(blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR, 2)) {
+                if (onSetPlanetDissolvingRef.current) onSetPlanetDissolvingRef.current(planet.id, true);
+            } else if (mesh.position.length() < blackHoleActualRadius * 0.9 || planet.timeToLive <= 0) {
+                if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
+                return;
+            } else if (planet.isStretching || planet.timeToLive < 10) { 
+                currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, planet.timeToLive));
+                planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleActualRadius * 0.5); 
+            }
+
+            // Update stretching state (only if not dissolving)
+            if (!planet.isStretching && distanceToCenterSq < Math.pow(blackHoleActualRadius * 1.5, 2)) { 
+                planet.isStretching = true;
+                const radialDir = mesh.position.clone().normalize();
+                planet.stretchAxis = {x: -radialDir.x, y: -radialDir.y, z: -radialDir.z };
+            }
+
+            // Apply stretching transformation (only if not dissolving)
+            if (planet.isStretching) { 
+                const stretchFactor = Math.min(5, 1 + (Math.pow(blackHoleActualRadius,2) / Math.max(distanceToCenterSq, 0.01)) * 2); 
+                const squashFactor = 1 / Math.sqrt(stretchFactor); 
+
+                mesh.scale.set(
+                    planet.initialScale.x * squashFactor,
+                    planet.initialScale.y * squashFactor,
+                    planet.initialScale.z * squashFactor
+                );
+
+                let targetDir = mesh.position.clone().normalize().multiplyScalar(-1); 
+                if (Math.abs(planet.stretchAxis.x) + Math.abs(planet.stretchAxis.y) + Math.abs(planet.stretchAxis.z) > 0.1) {
+                    const stretchDir = new THREE.Vector3(planet.stretchAxis.x, planet.stretchAxis.y, planet.stretchAxis.z).normalize();
+                    targetDir = stretchDir; 
+                }
+
+                const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetDir); 
+                mesh.quaternion.slerp(quaternion, 0.1); 
+                mesh.scale.z *= stretchFactor / squashFactor; 
+            } else { 
+                mesh.scale.set(planet.currentScale.x, planet.currentScale.y, planet.currentScale.z);
             }
         }
 
-
-        const x = currentOrbitRadius * Math.cos(planet.currentAngle);
-        const z = currentOrbitRadius * Math.sin(planet.currentAngle);
+        const x = planet.orbitRadius * Math.cos(planet.currentAngle);
+        const z = planet.orbitRadius * Math.sin(planet.currentAngle);
         mesh.position.set(x, planet.yOffset, z);
-
-
-        if (!planet.isDissolving && distanceToCenterSq < Math.pow(blackHoleRadius * DISSOLUTION_START_RADIUS_FACTOR, 2)) {
-            if (onSetPlanetDissolvingRef.current) onSetPlanetDissolvingRef.current(planet.id, true);
-        }
-        
-        if (!planet.isDissolving && distanceToCenterSq < blackHoleRadiusSq * 1.5 * 1.5 && !planet.isStretching) { 
-            planet.isStretching = true;
-            const radialDir = new THREE.Vector3(x, planet.yOffset, z).normalize();
-            planet.stretchAxis = {x: -radialDir.x, y: -radialDir.y, z: -radialDir.z };
-        }
-
-
-        if (planet.isStretching && !planet.isDissolving) { 
-            const stretchFactor = Math.min(5, 1 + (blackHoleRadiusSq / Math.max(distanceToCenterSq, 0.01)) * 2); 
-            const squashFactor = 1 / Math.sqrt(stretchFactor); 
-
-            mesh.scale.set(
-                planet.initialScale.x * squashFactor,
-                planet.initialScale.y * squashFactor,
-                planet.initialScale.z * squashFactor
-            );
-
-            let targetDir = mesh.position.clone().normalize().multiplyScalar(-1); 
-            if (Math.abs(planet.stretchAxis.x) + Math.abs(planet.stretchAxis.y) + Math.abs(planet.stretchAxis.z) > 0.1) {
-                const stretchDir = new THREE.Vector3(planet.stretchAxis.x, planet.stretchAxis.y, planet.stretchAxis.z).normalize();
-                targetDir = stretchDir; 
-            }
-
-            const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetDir); 
-            mesh.quaternion.slerp(quaternion, 0.1); 
-            mesh.scale.z *= stretchFactor / squashFactor; 
-        } else if (!planet.isDissolving) { 
-            mesh.scale.set(planet.currentScale.x, planet.currentScale.y, planet.currentScale.z);
-        }
-
-
-        if (!planet.isDissolving && (distanceToCenterSq < blackHoleRadiusSq * 0.8 || planet.timeToLive <= 0)) { 
-            if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
-            dissolvingObjectsProgressRef.current.delete(planet.id); 
-        }
       });
 
 
@@ -747,9 +741,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 (mesh.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.set(planet.color);
             }
           }
+          // Reset scale if not dissolving and progress was somehow set (e.g. from a previous state)
+          // This ensures that if an object is re-used or state changes, it starts fresh unless actively dissolving
           if (!planet.isDissolving) {
              let progress = dissolvingObjectsProgressRef.current.get(planet.id);
-             if (progress === undefined) { 
+             if (progress === undefined) { // Only reset if no active dissolution progress
                 mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
              }
           }
