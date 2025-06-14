@@ -26,20 +26,20 @@ interface ThreeBlackholeCanvasProps {
   onCameraUpdate: (position: { x: number; y: number; z: number }) => void;
   spawnedPlanets: PlanetState[];
   onAbsorbPlanet: (id: number) => void;
-  onSetPlanetDissolving: (id: number, dissolving: boolean) => void; // New prop
+  onSetPlanetDissolving: (id: number, dissolving: boolean) => void;
   isEmittingJets: boolean;
   onCameraReady?: (camera: THREE.PerspectiveCamera) => void;
   onShiftClickSpawnAtPoint?: (position: THREE.Vector3) => void;
 }
 
 const NUM_PARTICLES = 50000;
-const baseAngularSpeed = 1.0; 
-const minAngularSpeedFactor = 0.02; 
+const baseAngularSpeed = 1.0;
+const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
-const PULL_IN_FACTOR = 0.1; 
+const PULL_IN_FACTOR = 0.1;
 
-const DISSOLUTION_START_RADIUS_FACTOR = 1.1; // Objects start dissolving if distance < blackHoleRadius * this factor
-const DISSOLUTION_DURATION = 1.5; // Seconds for an object to fully dissolve
+const DISSOLUTION_START_RADIUS_FACTOR = 1.1;
+const DISSOLUTION_DURATION = 1.5;
 
 interface DiskParticleData {
   radius: number;
@@ -457,7 +457,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       const deltaTime = clockRef.current.getDelta();
       const elapsedTime = clockRef.current.getElapsedTime();
 
-      controls.update();
+      controlsRef.current?.update();
 
       if (blackHoleMaterialRef.current) {
         blackHoleMaterialRef.current.uniforms.u_time.value = elapsedTime;
@@ -505,14 +505,13 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 planet.initialScale.z * scaleFactor
             );
             
-            // Gradually pull towards center as it dissolves
             currentOrbitRadius -= (PULL_IN_FACTOR * 2) * blackHoleRadius * deltaTime * progress; 
-            planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleRadius * 0.1); // Ensure it doesn't go past center
+            planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleRadius * 0.1); 
 
             if (progress >= 1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
                 dissolvingObjectsProgressRef.current.delete(planet.id);
-                return; // Skip further processing for this fully dissolved object
+                return; 
             }
         } else {
             if (planet.isStretching || planet.timeToLive < 10) { 
@@ -539,7 +538,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         }
 
 
-        if (planet.isStretching && !planet.isDissolving) { // Don't apply stretch if dissolving
+        if (planet.isStretching && !planet.isDissolving) { 
             const stretchFactor = Math.min(5, 1 + (blackHoleRadiusSq / Math.max(distanceToCenterSq, 0.01)) * 2); 
             const squashFactor = 1 / Math.sqrt(stretchFactor); 
 
@@ -558,14 +557,14 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetDir); 
             mesh.quaternion.slerp(quaternion, 0.1); 
             mesh.scale.z *= stretchFactor / squashFactor; 
-        } else if (!planet.isDissolving) { // Apply normal scale if not stretching and not dissolving
+        } else if (!planet.isDissolving) { 
             mesh.scale.set(planet.currentScale.x, planet.currentScale.y, planet.currentScale.z);
         }
 
 
         if (!planet.isDissolving && (distanceToCenterSq < blackHoleRadiusSq * 0.8 || planet.timeToLive <= 0)) { 
             if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
-            dissolvingObjectsProgressRef.current.delete(planet.id); // Clean up just in case
+            dissolvingObjectsProgressRef.current.delete(planet.id); 
         }
       });
 
@@ -637,6 +636,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       window.removeEventListener('resize', handleResize);
       if (currentRendererDomElement) {
         currentRendererDomElement.removeEventListener('pointerdown', handleCanvasShiftClick);
+      }
+      if (controlsRef.current) {
+        controlsRef.current.dispose();
       }
       cancelAnimationFrame(animationFrameId);
       planetMeshesRef.current.forEach(mesh => {
@@ -729,10 +731,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
         scene.add(mesh);
         planetMeshesRef.current.set(planet.id, mesh);
-      } else { // Object already exists, might need material update or scale reset if not dissolving
+      } else { 
         const mesh = planetMeshesRef.current.get(planet.id);
         if (mesh) {
-          // Update material if type changed (though not a current feature, good for robustness)
           const expectedMaterialType = planet.type === 'star' ? THREE.MeshBasicMaterial : THREE.MeshStandardMaterial;
           if (!(mesh.material instanceof expectedMaterialType)) {
              (mesh.material as THREE.Material).dispose();
@@ -741,16 +742,14 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
              } else {
                 mesh.material = new THREE.MeshStandardMaterial({ color: planet.color, roughness: 0.5, metalness: 0.1 });
              }
-          } else { // Same material type, update color if needed
+          } else { 
             if ((mesh.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.getHexString() !== new THREE.Color(planet.color).getHexString()) { 
                 (mesh.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.set(planet.color);
             }
           }
-          // If the object is no longer dissolving (e.g. state reset externally, though unlikely with current flow)
-          // or if it's just been created and is NOT dissolving, ensure its scale is correct.
           if (!planet.isDissolving) {
              let progress = dissolvingObjectsProgressRef.current.get(planet.id);
-             if (progress === undefined) { // Not currently dissolving or was never dissolving
+             if (progress === undefined) { 
                 mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
              }
           }
@@ -766,7 +765,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
           mesh.geometry.dispose();
           (mesh.material as THREE.Material).dispose();
           planetMeshesRef.current.delete(id);
-          dissolvingObjectsProgressRef.current.delete(id); // Clean up progress map
+          dissolvingObjectsProgressRef.current.delete(id); 
         }
       }
     });
@@ -777,4 +776,3 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
-
