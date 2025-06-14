@@ -14,6 +14,9 @@ interface ThreeBlackholeCanvasProps {
 }
 
 const NUM_PARTICLES = 50000; // Number of particles in the accretion disk
+const baseAngularSpeed = 1.0; // Increased for faster inner particles and steeper gradient
+const minAngularSpeedFactor = 0.02; // Ensures outer particles still move
+const photonRingThreshold = 0.03; // Normalized distance for the bright inner "photon ring" coloration
 
 interface ParticleData {
   radius: number;
@@ -144,8 +147,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     const colorOuter = new THREE.Color(0.2, 0.1, 0.7); 
     const colorPhotonRing = new THREE.Color(1.0, 0.95, 0.85); 
 
-    const baseAngularSpeed = 0.2; 
-    const minAngularSpeedFactor = 0.02; 
     const outerFadeStartNormalized = 0.7; 
 
     for (let i = 0; i < NUM_PARTICLES; i++) {
@@ -158,14 +159,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       let normalizedDist = (radius - innerR) / (outerR - innerR);
       normalizedDist = Math.max(0, Math.min(1, normalizedDist));
 
-      const keplerianFactor = Math.pow(innerR / radius, 2.0); 
-      let angularVelocity = baseAngularSpeed * keplerianFactor;
-
-      const photonRingThreshold = 0.03;
-      if (normalizedDist < photonRingThreshold) {
-        angularVelocity *= 5.0; 
-      }
+      // Angular velocity calculation:
+      // Higher power (2.5) for a steeper falloff from inner to outer edge.
+      // baseAngularSpeed increased to make inner particles very fast.
+      let angularVelocity = baseAngularSpeed * Math.pow(innerR / radius, 2.5);
       
+      // Ensure a minimum speed for outer particles so they don't appear static.
       angularVelocity = Math.max(angularVelocity, baseAngularSpeed * minAngularSpeedFactor);
 
       particleDataRef.current.push({ radius, angle, angularVelocity, yOffset });
@@ -181,6 +180,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         particleColor.lerpColors(colorMid, colorOuter, (normalizedDist - 0.5) * 2.0);
       }
       
+      // Color adjustment for photon ring effect (visual only, does not affect speed multiplier here)
       if (normalizedDist < photonRingThreshold) {
         let photonRingIntensity = (photonRingThreshold - normalizedDist) / photonRingThreshold;
         photonRingIntensity = Math.pow(photonRingIntensity, 2.0); 
@@ -410,4 +410,3 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
-
