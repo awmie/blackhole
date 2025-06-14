@@ -5,9 +5,9 @@ export const lensingShader = {
   uniforms: {
     uTexture: { value: null as THREE.Texture | null },
     uBlackHolePos: { value: new (require('three') as typeof THREE).Vector2(0.5, 0.5) },
-    uStrength: { value: 0.03 }, 
+    uStrength: { value: 0.015 }, 
     uAspectRatio: { value: 1.0 }, 
-    uBlackHoleScreenRadius: { value: 0.0 }, // Added: Projected radius of black hole
+    uBlackHoleScreenRadius: { value: 0.0 },
   },
   vertexShader: `
     varying vec2 vUv;
@@ -32,8 +32,8 @@ export const lensingShader = {
 
       float intensity = 0.0;
       // Define the band where lensing occurs, relative to the black hole's screen radius
-      float bandOuterEdge = uBlackHoleScreenRadius * 1.8; 
-      float bandInnerEdge = uBlackHoleScreenRadius * 0.85; 
+      float bandOuterEdge = uBlackHoleScreenRadius * 1.3; 
+      float bandInnerEdge = uBlackHoleScreenRadius * 0.92; 
       
       // Intensity profile: peaks at uBlackHoleScreenRadius, fades to 0 towards bandInnerEdge and bandOuterEdge
       if (distFromCenter > bandInnerEdge && distFromCenter < uBlackHoleScreenRadius) {
@@ -47,7 +47,7 @@ export const lensingShader = {
 
       if (intensity > 0.0) {
         // Displacement is proportional to intensity & strength, inversely to distance from center.
-        float displacementMagnitude = uStrength * intensity / (distFromCenter + 0.01); // Add 0.01 to avoid div by zero
+        float displacementMagnitude = uStrength * intensity / (distFromCenter + 0.001); // Add small epsilon to avoid div by zero
         
         // dir is direction from black hole center to current pixel (aspect-corrected)
         vec2 dir = normalize(centeredUv); 
