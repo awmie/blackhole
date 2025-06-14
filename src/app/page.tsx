@@ -21,6 +21,7 @@ export interface PlanetState {
   initialScale: { x: number; y: number; z: number };
   timeToLive: number;
   isDissolving: boolean;
+  currentMassFactor?: number; // For stars, starts at 1.0 and decreases
 }
 
 const ThreeBlackholeCanvas = React.lazy(() => import('@/components/event-horizon/three-blackhole-canvas'));
@@ -48,6 +49,7 @@ const SPAWNED_OBJECT_SPEED_SCALAR = 1.5;
 const CLOSE_SPAWN_TIME_TO_LIVE = 2.0; 
 const CLOSE_SPAWN_RADIUS_FACTOR = 1.3;
 const DISSOLUTION_EFFECT_DURATION = 1.5; 
+const STAR_MIN_MASS_FACTOR_BEFORE_DISSOLUTION = 0.1;
 
 
 export default function Home() {
@@ -121,13 +123,15 @@ export default function Home() {
     angularVelocity = Math.abs(angularVelocity);
 
 
-    let color, initialScale;
+    let color, initialScale, currentMassFactor;
     if (selectedObjectType === 'star') {
       color = '#FFFF99'; 
       initialScale = { x: 0.2, y: 0.2, z: 0.2 };
+      currentMassFactor = 1.0;
     } else {
       color = `hsl(${Math.random() * 360}, 70%, 60%)`;
       initialScale = { x: 0.1, y: 0.1, z: 0.1 };
+      currentMassFactor = undefined;
     }
     
     let timeToLive = 60 + Math.random() * 60;
@@ -145,13 +149,14 @@ export default function Home() {
       color,
       initialScale,
       timeToLive: timeToLive,
-      isDissolving: false, 
+      isDissolving: false,
+      currentMassFactor,
     };
     setSpawnedObjects(prev => [...prev, newObject]);
   }, [nextObjectId, blackHoleRadius, accretionDiskOuterRadius, accretionDiskInnerRadius, selectedObjectType]);
 
   const triggerJetEmission = useCallback(() => {
-    if (isEmittingJets) return; // Prevent re-triggering if already active
+    if (isEmittingJets) return; 
     setIsEmittingJets(true);
     setTimeout(() => setIsEmittingJets(false), HAWKING_RADIATION_DURATION);
   }, [isEmittingJets]);
@@ -177,6 +182,27 @@ export default function Home() {
       prevObjects.map(obj => 
         obj.id === objectId ? { ...obj, isDissolving: dissolving, timeToLive: dissolving ? DISSOLUTION_EFFECT_DURATION : obj.timeToLive } : obj
       )
+    );
+  }, []);
+
+  const handleStarMassLoss = useCallback((starId: number, massLossAmount: number) => {
+    setSpawnedObjects(prevObjects =>
+      prevObjects.map(obj => {
+        if (obj.id === starId && obj.type === 'star') {
+          const newMassFactor = Math.max(STAR_MIN_MASS_FACTOR_BEFORE_DISSOLUTION, (obj.currentMassFactor ?? 1.0) - massLossAmount);
+          if (newMassFactor <= STAR_MIN_MASS_FACTOR_BEFORE_DISSOLUTION && !obj.isDissolving) {
+            // If mass is critically low, trigger dissolution or ensure it will be absorbed soon
+            return { 
+              ...obj, 
+              currentMassFactor: newMassFactor, 
+              isDissolving: true, // Start dissolving effect
+              timeToLive: Math.min(obj.timeToLive, DISSOLUTION_EFFECT_DURATION * 1.2) // Ensure it dissolves quickly
+            };
+          }
+          return { ...obj, currentMassFactor: newMassFactor };
+        }
+        return obj;
+      })
     );
   }, []);
 
@@ -228,9 +254,11 @@ export default function Home() {
             isEmittingJets={isEmittingJets}
             onCameraReady={setSimulationCamera}
             onShiftClickSpawnAtPoint={handleSpawnObject}
+            onStarMassLoss={handleStarMassLoss}
           />
         </Suspense>
       </div>
     </div>
   );
 }
+
