@@ -38,7 +38,7 @@ const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
 const PULL_IN_FACTOR = 0.1; 
 
-const DISSOLUTION_START_RADIUS_FACTOR = 1.05; // Reduced from 1.1
+const DISSOLUTION_START_RADIUS_FACTOR = 1.05; 
 const DISSOLUTION_DURATION = 1.5; 
 
 interface DiskParticleData {
@@ -72,11 +72,11 @@ float simpleNoise(vec2 st) {
 float fbm(vec2 st) {
     float value = 0.0;
     float amplitude = 0.5;
-    float frequency = 2.0; // Base frequency
-    for (int i = 0; i < 6; i++) { // 6 octaves for detail
+    float frequency = 2.0; 
+    for (int i = 0; i < 6; i++) { 
         value += amplitude * simpleNoise(st * frequency);
-        st *= 2.2; // Increase frequency for each octave (lacunarity)
-        amplitude *= 0.45; // Decrease amplitude for each octave (persistence/gain)
+        st *= 2.2; 
+        amplitude *= 0.45; 
     }
     return value;
 }
@@ -85,13 +85,11 @@ void main() {
   vec3 normal = normalize(v_normal);
   vec3 viewDir = normalize(u_cameraPosition - v_worldPosition);
 
-  // Sharper Fresnel effect for intense edge highlighting
-  float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 7.0) * 3.5; // Increased power and multiplier
+  float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 7.0) * 3.5; 
   fresnel = clamp(fresnel, 0.0, 1.0);
 
-  float timeFactor = u_time * 0.07; // Base time for animation
+  float timeFactor = u_time * 0.07; 
 
-  // More complex noise coordinates for swirling, chaotic effect
   vec2 noiseCoordBase1 = v_worldPosition.xz * 0.7 + timeFactor * 0.06;
   noiseCoordBase1.x += sin(v_worldPosition.y * 18.0 + timeFactor * 0.25) * 0.35;
   noiseCoordBase1.y += cos(v_worldPosition.x * 15.0 - timeFactor * 0.21) * 0.3;
@@ -100,23 +98,18 @@ void main() {
   noiseCoordBase2.y += cos(v_worldPosition.z * 14.0 - timeFactor * 0.18) * 0.3;
   noiseCoordBase2.x += sin(v_worldPosition.z * 16.0 + timeFactor * 0.28) * 0.25;
 
-  // Generate noise values using fbm
   float noiseVal1 = fbm(noiseCoordBase1);
   float noiseVal2 = fbm(noiseCoordBase2 * 1.4 + vec2(sin(timeFactor*0.12), cos(timeFactor*0.12)) * 0.6);
 
-  // Combine noise, make it more prominent at edges
-  float radialDistFactor = smoothstep(0.8, 1.0, length(v_worldPosition.xy / length(vec2(1.0,1.0)))); // Normalize based on unit sphere
+  float radialDistFactor = smoothstep(0.8, 1.0, length(v_worldPosition.xy / length(vec2(1.0,1.0)))); 
   float combinedNoise = (noiseVal1 * 0.6 + noiseVal2 * 0.4) * (0.3 + radialDistFactor * 0.7);
-  combinedNoise = smoothstep(0.3, 0.7, combinedNoise); // Remap noise to a nicer range
+  combinedNoise = smoothstep(0.3, 0.7, combinedNoise); 
 
-  // Define colors
-  vec3 coreColor = vec3(0.0, 0.0, 0.0); // Black core
-  vec3 lensedLightColor = vec3(1.0, 0.75, 0.9); // Bright, accretion-disk inspired pinkish-white
+  vec3 coreColor = vec3(0.0, 0.0, 0.0); 
+  vec3 lensedLightColor = vec3(1.0, 0.75, 0.9); 
 
-  // Modulate lensed light by Fresnel and noise, ensuring high intensity at edges
-  float effectIntensity = fresnel * combinedNoise * 2.5; // Increased intensity multiplier
+  float effectIntensity = fresnel * combinedNoise * 2.5; 
   
-  // Mix core black with lensed light
   vec3 finalColor = mix(coreColor, lensedLightColor, clamp(effectIntensity, 0.0, 1.0));
 
   gl_FragColor = vec4(finalColor, 1.0);
@@ -490,6 +483,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         
         let currentOrbitRadius = planet.orbitRadius;
         const blackHoleActualRadius = blackHoleRadius;
+        const distanceToCenterSq = mesh.position.lengthSq();
 
 
         if (planet.isDissolving) {
@@ -506,52 +500,59 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             );
             
             currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (0.5 + progress * 1.5);
-            planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleActualRadius * 0.1); // Prevent going to zero/negative radius
+            planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleActualRadius * 0.1);
 
             if (progress >= 1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
             }
         } else {
-            // Not dissolving: check for starting dissolution or direct absorption
-            const distanceToCenterSq = mesh.position.lengthSq();
+            // Not dissolving: check for starting dissolution, direct absorption, gentle pull-in, or stretching
             if (distanceToCenterSq < Math.pow(blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR, 2)) {
                 if (onSetPlanetDissolvingRef.current) onSetPlanetDissolvingRef.current(planet.id, true);
             } else if (mesh.position.length() < blackHoleActualRadius * 0.9 || planet.timeToLive <= 0) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
-            } else if (planet.isStretching || planet.timeToLive < 10) { 
-                currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, planet.timeToLive));
-                planet.orbitRadius = currentOrbitRadius; // Allow to spiral in closer, relying on other checks for absorption/dissolution
-            }
-
-            // Update stretching state (only if not dissolving)
-            if (!planet.isStretching && distanceToCenterSq < Math.pow(blackHoleActualRadius * 1.5, 2)) { 
-                planet.isStretching = true;
-                const radialDir = mesh.position.clone().normalize();
-                planet.stretchAxis = {x: -radialDir.x, y: -radialDir.y, z: -radialDir.z };
-            }
-
-            // Apply stretching transformation (only if not dissolving)
-            if (planet.isStretching) { 
-                const stretchFactor = Math.min(5, 1 + (Math.pow(blackHoleActualRadius,2) / Math.max(distanceToCenterSq, 0.01)) * 2); 
-                const squashFactor = 1 / Math.sqrt(stretchFactor); 
-
-                mesh.scale.set(
-                    planet.initialScale.x * squashFactor,
-                    planet.initialScale.y * squashFactor,
-                    planet.initialScale.z * squashFactor
-                );
-
-                let targetDir = mesh.position.clone().normalize().multiplyScalar(-1); 
-                if (Math.abs(planet.stretchAxis.x) + Math.abs(planet.stretchAxis.y) + Math.abs(planet.stretchAxis.z) > 0.1) {
-                    const stretchDir = new THREE.Vector3(planet.stretchAxis.x, planet.stretchAxis.y, planet.stretchAxis.z).normalize();
-                    targetDir = stretchDir; 
+            } else {
+                 // Stretching logic (only if not dissolving)
+                if (!planet.isStretching && distanceToCenterSq < Math.pow(blackHoleActualRadius * 1.5, 2)) { 
+                    planet.isStretching = true;
+                    const radialDir = mesh.position.clone().normalize();
+                    planet.stretchAxis = {x: radialDir.x, y: radialDir.y, z: radialDir.z };
+                } else if (planet.isStretching && distanceToCenterSq >= Math.pow(blackHoleActualRadius * 1.5, 2)) {
+                    planet.isStretching = false; // Reset if it moves out of stretching radius
                 }
 
-                const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetDir); 
-                mesh.quaternion.slerp(quaternion, 0.1); 
-                mesh.scale.z *= stretchFactor / squashFactor; 
-            } else { 
-                mesh.scale.set(planet.currentScale.x, planet.currentScale.y, planet.currentScale.z);
+                // Gentle pull-in if stretching or timeToLive is low (and not dissolving)
+                if (planet.isStretching || planet.timeToLive < 10) { 
+                    currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, planet.timeToLive)) * 0.2; // Reduced gentle pull
+                    planet.orbitRadius = currentOrbitRadius;
+                }
+
+                // Apply scale and rotation based on state
+                if (planet.isStretching) { 
+                    const baseScaleX = planet.initialScale.x;
+                    const baseScaleY = planet.initialScale.y;
+                    const baseScaleZ = planet.initialScale.z;
+                    
+                    const stretchFactor = Math.min(5, 1 + (Math.pow(blackHoleActualRadius,2) / Math.max(distanceToCenterSq, 0.01)) * 2); 
+                    const squashFactor = 1 / Math.sqrt(stretchFactor); 
+
+                    mesh.scale.set(
+                        baseScaleX * squashFactor,
+                        baseScaleY * squashFactor,
+                        baseScaleZ * squashFactor 
+                    );
+                    
+                    // Align object towards the black hole (origin)
+                    let targetDir = mesh.position.clone().normalize().multiplyScalar(-1);
+                    const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetDir); 
+                    mesh.quaternion.slerp(quaternion, 0.1); 
+                    mesh.scale.z *= stretchFactor; // Assuming Z is the elongated axis after rotation
+
+                } else { 
+                    // Not stretching, not dissolving: Reset to initial scale and default rotation
+                    mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
+                    mesh.quaternion.slerp(new THREE.Quaternion(), 0.1); // Reset to default identity quaternion
+                }
             }
         }
 
@@ -739,11 +740,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 (mesh.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.set(planet.color);
             }
           }
-          // Reset scale if not dissolving and progress was somehow set (e.g. from a previous state)
-          // This ensures that if an object is re-used or state changes, it starts fresh unless actively dissolving
+          
           if (!planet.isDissolving) {
              let progress = dissolvingObjectsProgressRef.current.get(planet.id);
-             if (progress === undefined) { // Only reset if no active dissolution progress
+             if (progress === undefined && !planet.isStretching) { 
                 mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
              }
           }
@@ -770,6 +770,3 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
-
-
-    

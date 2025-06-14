@@ -19,7 +19,6 @@ export interface PlanetState {
   yOffset: number;
   color: string;
   initialScale: { x: number; y: number; z: number };
-  currentScale: { x: number; y: number; z: number };
   timeToLive: number;
   isStretching: boolean;
   stretchAxis: { x: number; y: number; z: number };
@@ -48,9 +47,9 @@ const HAWKING_RADIATION_DURATION = 5000;
 const SPAWNED_OBJECT_BASE_SPEED = 2.0;
 const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02;
 const SPAWNED_OBJECT_SPEED_SCALAR = 1.5; 
-const CLOSE_SPAWN_TIME_TO_LIVE = 2.0; // Increased for visibility
+const CLOSE_SPAWN_TIME_TO_LIVE = 2.0; 
 const CLOSE_SPAWN_RADIUS_FACTOR = 1.3;
-const DISSOLUTION_EFFECT_DURATION = 1.5; // Duration for the dissolution effect
+const DISSOLUTION_EFFECT_DURATION = 1.5; 
 
 
 export default function Home() {
@@ -148,7 +147,6 @@ export default function Home() {
       yOffset,
       color,
       initialScale,
-      currentScale: { ...initialScale },
       timeToLive: timeToLive,
       isStretching: false,
       stretchAxis: { x: 0, y: 0, z: 1 },
