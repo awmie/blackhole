@@ -18,6 +18,7 @@ export interface JetParticleState {
 }
 
 interface EvolvingPlanetData {
+  id: number; // Added id for easier debugging and consistency
   angle: number;
   radius: number;
   ttl: number;
@@ -43,7 +44,7 @@ const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
 
 const PULL_IN_FACTOR_DISSOLVING = 0.1;
-const PULL_IN_FACTOR_LOW_TTL = 0.02;
+const CONTINUOUS_ORBITAL_DECAY_RATE = 0.002; // For gradual inward spiral of non-dissolving objects
 
 const DISSOLUTION_START_RADIUS_FACTOR = 1.05;
 const DISSOLUTION_DURATION = 1.5; // Duration in seconds for the dissolution effect
@@ -342,6 +343,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
   useEffect(() => {
     if (!mountRef.current || !rendererRef.current) return;
+    const THREE = require('three') as typeof THREE_TYPE;
+    if (!THREE) return;
 
     const scene = sceneRef.current;
     if (!scene) return;
@@ -521,14 +524,17 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             );
             
             currentPlanetOrbitRadius -= PULL_IN_FACTOR_DISSOLVING * blackHoleActualRadius * deltaTime * (0.5 + progress * 1.5);
-            currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.1);
+            currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.1); // Prevent going inside black hole visually
 
             if (progress >= 1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planetProp.id);
             }
-        } else {
+        } else { // Not dissolving
             mesh.scale.set(planetProp.initialScale.x, planetProp.initialScale.y, planetProp.initialScale.z);
-            mesh.quaternion.slerp(new THREE.Quaternion(), 0.1);
+            mesh.quaternion.slerp(new THREE.Quaternion(), 0.1); // Reset rotation if not stretching
+
+            // Apply continuous orbital decay
+            currentPlanetOrbitRadius -= CONTINUOUS_ORBITAL_DECAY_RATE * blackHoleActualRadius * deltaTime;
 
             const currentPositionVec = new THREE.Vector3(
               currentPlanetOrbitRadius * Math.cos(currentPlanetAngle),
@@ -540,16 +546,14 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             if (distanceToCenterSq < Math.pow(blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR, 2)) {
                 if (onSetPlanetDissolvingRef.current) onSetPlanetDissolvingRef.current(planetProp.id, true);
             } else if (currentPositionVec.length() < blackHoleActualRadius * 0.9 || currentPlanetTimeToLive <= 0) {
+                // Direct absorption if too close or TTL expired (and not dissolving yet)
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planetProp.id);
-            } else {
-                 if (currentPlanetTimeToLive < 10) { // Gentle pull for objects with low TTL
-                     currentPlanetOrbitRadius -= PULL_IN_FACTOR_LOW_TTL * blackHoleActualRadius * deltaTime * (10 / Math.max(1, currentPlanetTimeToLive)) * 0.2; // Reduced factor
-                 }
-                currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * (DISSOLUTION_START_RADIUS_FACTOR - 0.01) );
             }
+            // Ensure radius doesn't become negative or unphysically small before absorption/dissolution check
+             currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.1); 
         }
         
-        evolvingData.radius = currentPlanetOrbitRadius; // Store updated radius back to evolving data
+        evolvingData.radius = currentPlanetOrbitRadius; 
 
         const x = currentPlanetOrbitRadius * Math.cos(currentPlanetAngle);
         const z = currentPlanetOrbitRadius * Math.sin(currentPlanetAngle);
@@ -662,7 +666,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       diskParticleDataRef.current = [];
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createAndAddAccretionParticles, initJetParticles, onCameraReady]);
+  }, [createAndAddAccretionParticles, initJetParticles, onCameraReady]); // Dependencies for main setup effect
 
   useEffect(() => {
     if (blackHoleRef.current) {
@@ -690,7 +694,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accretionDiskInnerRadius, accretionDiskOuterRadius, createAndAddAccretionParticles]);
+  }, [accretionDiskInnerRadius, accretionDiskOuterRadius, createAndAddAccretionParticles]); // Recreate disk if radii change
 
   useEffect(() => {
     if (accretionDiskRef.current?.material) {
@@ -699,84 +703,83 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
        }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accretionDiskOpacity, createAndAddAccretionParticles]);
+  }, [accretionDiskOpacity, createAndAddAccretionParticles]); // Recreate disk if opacity changes
 
+
+  // Effect for managing planet meshes and their evolving data based on spawnedPlanets prop
   useEffect(() => {
     const scene = sceneRef.current;
-    if (!scene) return;
     const THREE = require('three') as typeof THREE_TYPE;
-    if (!THREE) return;
+    if (!scene || !THREE) return;
 
-    const currentPlanetMeshMap = planetMeshesRef.current;
-    const newPlanetMeshMap = new Map<number, THREE_TYPE.Mesh>();
-    const currentEvolvingDataMap = evolvingPlanetDataRef.current;
-    const newEvolvingDataMap = new Map<number, EvolvingPlanetData>();
+    const currentPlanetMeshIds = new Set(planetMeshesRef.current.keys());
+    const incomingPlanetIds = new Set(spawnedPlanets.map(p => p.id));
 
-    spawnedPlanets.forEach(planet => {
-      let mesh = currentPlanetMeshMap.get(planet.id);
-      
+    // Add new planets and update existing ones
+    spawnedPlanets.forEach(planetProp => {
+      let mesh = planetMeshesRef.current.get(planetProp.id);
       if (!mesh) {
         const geometry = new THREE.SphereGeometry(1, 16, 16);
         let material;
-        if (planet.type === 'star') {
-          material = new THREE.MeshBasicMaterial({ color: planet.color });
+        if (planetProp.type === 'star') {
+          material = new THREE.MeshBasicMaterial({ color: planetProp.color });
         } else {
-          material = new THREE.MeshStandardMaterial({ color: planet.color, roughness: 0.5, metalness: 0.1 });
+          material = new THREE.MeshStandardMaterial({ color: planetProp.color, roughness: 0.5, metalness: 0.1 });
         }
         mesh = new THREE.Mesh(geometry, material);
-        mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
         scene.add(mesh);
+        planetMeshesRef.current.set(planetProp.id, mesh);
+        
+        // Initialize evolving data for new planet
+        evolvingPlanetDataRef.current.set(planetProp.id, {
+          id: planetProp.id,
+          angle: planetProp.currentAngle,
+          radius: planetProp.orbitRadius,
+          ttl: planetProp.timeToLive,
+        });
+      }
+
+      // Always ensure scale is correct for non-dissolving, or handled by dissolution logic
+      if (!planetProp.isDissolving) {
+        mesh.scale.set(planetProp.initialScale.x, planetProp.initialScale.y, planetProp.initialScale.z);
+      }
+      
+      // Update material color or type if changed (though type change isn't current feature)
+      const expectedMaterialType = planetProp.type === 'star' ? THREE.MeshBasicMaterial : THREE.MeshStandardMaterial;
+      if (!(mesh.material instanceof expectedMaterialType)) {
+         (mesh.material as THREE_TYPE.Material).dispose();
+         if (planetProp.type === 'star') {
+            mesh.material = new THREE.MeshBasicMaterial({ color: planetProp.color });
+         } else {
+            mesh.material = new THREE.MeshStandardMaterial({ color: planetProp.color, roughness: 0.5, metalness: 0.1 });
+         }
       } else {
-        const expectedMaterialType = planet.type === 'star' ? THREE.MeshBasicMaterial : THREE.MeshStandardMaterial;
-        if (!(mesh.material instanceof expectedMaterialType)) {
-           (mesh.material as THREE_TYPE.Material).dispose();
-           if (planet.type === 'star') {
-              mesh.material = new THREE.MeshBasicMaterial({ color: planet.color });
-           } else {
-              mesh.material = new THREE.MeshStandardMaterial({ color: planet.color, roughness: 0.5, metalness: 0.1 });
-           }
-        } else {
-          if ((mesh.material as THREE_TYPE.MeshBasicMaterial | THREE_TYPE.MeshStandardMaterial).color.getHexString() !== new THREE.Color(planet.color).getHexString()) {
-              (mesh.material as THREE_TYPE.MeshBasicMaterial | THREE_TYPE.MeshStandardMaterial).color.set(planet.color);
-          }
-        }
-        if (!planet.isDissolving) { // Ensure scale is reset if not dissolving
-           mesh.scale.set(planet.initialScale.x, planet.initialScale.y, planet.initialScale.z);
+        if ((mesh.material as THREE_TYPE.MeshBasicMaterial | THREE_TYPE.MeshStandardMaterial).color.getHexString() !== new THREE.Color(planetProp.color).getHexString()) {
+            (mesh.material as THREE_TYPE.MeshBasicMaterial | THREE_TYPE.MeshStandardMaterial).color.set(planetProp.color);
         }
       }
-      newPlanetMeshMap.set(planet.id, mesh);
 
-      // Sync evolving data
-      const existingEvolvingEntry = currentEvolvingDataMap.get(planet.id);
-      if (existingEvolvingEntry && planet.id === existingEvolvingEntry.id) { // Check id if EvolvingPlanetData has it
-        newEvolvingDataMap.set(planet.id, existingEvolvingEntry);
-      } else {
-        newEvolvingDataMap.set(planet.id, {
-          angle: planet.currentAngle,
-          radius: planet.orbitRadius,
-          ttl: planet.timeToLive,
-        });
+      // Sync evolving data TTL if page.tsx updated it (e.g. for dissolution)
+      const evolvingData = evolvingPlanetDataRef.current.get(planetProp.id);
+      if (evolvingData && evolvingData.ttl !== planetProp.timeToLive && planetProp.isDissolving) {
+        evolvingData.ttl = planetProp.timeToLive; // Sync TTL specifically when dissolution starts
       }
     });
 
-    currentPlanetMeshMap.forEach((mesh, id) => {
-      if (!newPlanetMeshMap.has(id)) {
-        scene.remove(mesh);
-        mesh.geometry.dispose();
-        (mesh.material as THREE_TYPE.Material).dispose();
+    // Remove old planets
+    currentPlanetMeshIds.forEach(id => {
+      if (!incomingPlanetIds.has(id)) {
+        const mesh = planetMeshesRef.current.get(id);
+        if (mesh) {
+          scene.remove(mesh);
+          mesh.geometry.dispose();
+          (mesh.material as THREE_TYPE.Material).dispose();
+          planetMeshesRef.current.delete(id);
+        }
+        evolvingPlanetDataRef.current.delete(id);
         dissolvingObjectsProgressRef.current.delete(id);
       }
     });
-    planetMeshesRef.current = newPlanetMeshMap;
-
-    currentEvolvingDataMap.forEach((_, id) => {
-        if(!newEvolvingDataMap.has(id)) {
-            // This case should ideally not happen if logic is correct,
-            // but good for cleanup if a planet was in evolving data but not in spawnedPlanets
-        }
-    });
-    evolvingPlanetDataRef.current = newEvolvingDataMap;
-
   }, [spawnedPlanets, sceneRef]);
 
 
