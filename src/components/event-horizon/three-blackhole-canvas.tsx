@@ -505,12 +505,14 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 planet.initialScale.z * scaleFactor
             );
             
-            currentOrbitRadius -= (PULL_IN_FACTOR * 0.5) * blackHoleActualRadius * deltaTime * (0.2 + progress * 0.8);
+            currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (0.5 + progress * 1.5);
             planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleActualRadius * 0.1);
 
             if (progress >= 1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
-                return; 
+                // Note: object is not removed from spawnedPlanetsRef.current here,
+                // onAbsorbPlanet updates state in page.tsx, which then updates the prop,
+                // and the mesh cleanup logic handles the removal from scene.
             }
         } else {
             // Not dissolving: check for starting dissolution or direct absorption
@@ -519,7 +521,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 if (onSetPlanetDissolvingRef.current) onSetPlanetDissolvingRef.current(planet.id, true);
             } else if (mesh.position.length() < blackHoleActualRadius * 0.9 || planet.timeToLive <= 0) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planet.id);
-                return;
             } else if (planet.isStretching || planet.timeToLive < 10) { 
                 currentOrbitRadius -= PULL_IN_FACTOR * blackHoleActualRadius * deltaTime * (10 / Math.max(1, planet.timeToLive));
                 planet.orbitRadius = Math.max(currentOrbitRadius, blackHoleActualRadius * 0.5); 
@@ -772,3 +773,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
+
