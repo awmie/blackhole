@@ -265,7 +265,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     opacity: number
   ) => {
     const THREE = THREEInstanceRef.current;
-    const scene = foregroundSceneRef.current; // Add to foreground scene
+    const scene = foregroundSceneRef.current; 
     if (!THREE || !scene) return;
 
     if (accretionDiskRef.current) {
@@ -360,7 +360,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
   const initJetParticles = useCallback(() => {
     const THREE = THREEInstanceRef.current;
-    const scene = foregroundSceneRef.current; // Add to foreground scene
+    const scene = foregroundSceneRef.current; 
     if (!THREE || !scene) return;
 
     if (jetParticlesRef.current) {
@@ -415,7 +415,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
   const initStarEmittedParticles = useCallback(() => {
     const THREE = THREEInstanceRef.current;
-    const scene = foregroundSceneRef.current; // Add to foreground scene
+    const scene = foregroundSceneRef.current; 
     if (!THREE || !scene) return;
 
     if (starEmittedParticlesRef.current) {
@@ -530,10 +530,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         mountRef.current.clientWidth * window.devicePixelRatio,
         mountRef.current.clientHeight * window.devicePixelRatio
     );
-    starfieldRenderTargetRef.current.texture.minFilter = THREE.LinearFilter;
-    starfieldRenderTargetRef.current.texture.magFilter = THREE.LinearFilter;
-    starfieldRenderTargetRef.current.texture.wrapS = THREE.ClampToEdgeWrapping;
-    starfieldRenderTargetRef.current.texture.wrapT = THREE.ClampToEdgeWrapping;
+    if (starfieldRenderTargetRef.current) {
+        starfieldRenderTargetRef.current.texture.minFilter = THREE.LinearFilter;
+        starfieldRenderTargetRef.current.texture.magFilter = THREE.LinearFilter;
+        starfieldRenderTargetRef.current.texture.wrapS = THREE.ClampToEdgeWrapping;
+        starfieldRenderTargetRef.current.texture.wrapT = THREE.ClampToEdgeWrapping;
+    }
 
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -565,7 +567,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     createAndAddAccretionParticles(accretionDiskInnerRadius, accretionDiskOuterRadius, accretionDiskOpacity);
 
-    // Lensing Shader Setup
     const lensingPlaneGeometry = new THREE.PlaneGeometry(2, 2);
     lensingMaterialRef.current = new THREE.ShaderMaterial({
         uniforms: THREE.UniformsUtils.clone(lensingShader.uniforms),
@@ -574,6 +575,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         depthWrite: false,
         depthTest: false,
     });
+     if (lensingMaterialRef.current) {
+        lensingMaterialRef.current.uniforms.uBlackHoleScreenRadius = { value: 0.0 };
+    }
     lensingQuadRef.current = new THREE.Mesh(lensingPlaneGeometry, lensingMaterialRef.current);
     lensingQuadRef.current.frustumCulled = false;
     lensingSceneRef.current.add(lensingQuadRef.current);
@@ -590,7 +594,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
     const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.9, sizeAttenuation: true });
     starsRef.current = new THREE.Points(starsGeometry, starsMaterial);
-    backgroundSceneRef.current.add(starsRef.current); // Add to background scene
+    backgroundSceneRef.current.add(starsRef.current); 
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     foregroundSceneRef.current.add(ambientLight);
@@ -609,22 +613,22 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     const currentRendererDomElement = renderer.domElement;
     const handleCanvasShiftClick = (event: PointerEvent) => {
-      const THREE = THREEInstanceRef.current;
-      if (!event.shiftKey || !cameraRef.current || !onShiftClickSpawnAtPointRef.current || !THREE) return;
+      const THREE_INSTANCE = THREEInstanceRef.current;
+      if (!event.shiftKey || !cameraRef.current || !onShiftClickSpawnAtPointRef.current || !THREE_INSTANCE) return;
 
       event.preventDefault();
       event.stopPropagation();
 
       const rect = currentRendererDomElement.getBoundingClientRect();
-      const mouse = new THREE.Vector2();
+      const mouse = new THREE_INSTANCE.Vector2();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-      const raycaster = new THREE.Raycaster();
+      const raycaster = new THREE_INSTANCE.Raycaster();
       raycaster.setFromCamera(mouse, cameraRef.current);
 
-      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-      const intersectionPoint = new THREE.Vector3();
+      const plane = new THREE_INSTANCE.Plane(new THREE_INSTANCE.Vector3(0, 1, 0), 0);
+      const intersectionPoint = new THREE_INSTANCE.Vector3();
 
       if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
         onShiftClickSpawnAtPointRef.current(intersectionPoint);
@@ -636,20 +640,20 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     let animationFrameId: number;
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
-      const THREE = THREEInstanceRef.current;
-      const renderer = rendererRef.current;
-      const foregroundScene = foregroundSceneRef.current;
-      const backgroundScene = backgroundSceneRef.current;
-      const lensingScene = lensingSceneRef.current;
-      const mainCamera = cameraRef.current;
-      const lensingCam = lensingCameraRef.current;
-      const rt = starfieldRenderTargetRef.current;
-      const lMaterial = lensingMaterialRef.current;
-      const bh = blackHoleRef.current;
-      const tempVec = tempVectorRef.current;
+      const THREE_ANIM = THREEInstanceRef.current;
+      const renderer_anim = rendererRef.current;
+      const fgScene_anim = foregroundSceneRef.current;
+      const bgScene_anim = backgroundSceneRef.current;
+      const lensScene_anim = lensingSceneRef.current;
+      const mainCam_anim = cameraRef.current;
+      const lensCam_anim = lensingCameraRef.current;
+      const rt_anim = starfieldRenderTargetRef.current;
+      const lMaterial_anim = lensingMaterialRef.current;
+      const bh_anim = blackHoleRef.current;
+      const tempVec_anim = tempVectorRef.current;
 
 
-      if (!clockRef.current || !THREE || !renderer || !foregroundScene || !backgroundScene || !lensingScene || !mainCamera || !lensingCam || !rt || !lMaterial || !bh || !tempVec ) return;
+      if (!clockRef.current || !THREE_ANIM || !renderer_anim || !fgScene_anim || !bgScene_anim || !lensScene_anim || !mainCam_anim || !lensCam_anim || !rt_anim || !lMaterial_anim || !bh_anim || !tempVec_anim ) return;
 
       const deltaTime = clockRef.current.getDelta();
       const elapsedTime = clockRef.current.getElapsedTime();
@@ -692,7 +696,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
         const currentStarMassFactor = (planetProp.type === 'star' ? planetProp.currentMassFactor : 1.0) ?? 1.0;
 
-        const currentPositionVec = new THREE.Vector3(
+        const currentPositionVec = new THREE_ANIM.Vector3(
             currentPlanetOrbitRadius * Math.cos(currentPlanetAngle),
             planetProp.yOffset,
             currentPlanetOrbitRadius * Math.sin(currentPlanetAngle)
@@ -715,7 +719,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.05);
 
             if (planetProp.type === 'star' && starEmittedParticlesRef.current && starEmittedParticleDataRef.current.length > 0 && object3D) {
-                const starColor = new THREE.Color(planetProp.color);
+                const starColor = new THREE_ANIM.Color(planetProp.color);
                 for (let i = 0; i < STAR_DISSOLUTION_EMIT_RATE_PER_FRAME; i++) {
                     const pIndex = lastStarEmittedParticleIndexRef.current;
                     const particle = starEmittedParticleDataRef.current[pIndex];
@@ -723,7 +727,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     if (particle && !particle.active) {
                         particle.active = true;
                         particle.position.copy(object3D.position);
-                        const randomDirection = new THREE.Vector3(
+                        const randomDirection = new THREE_ANIM.Vector3(
                             Math.random() - 0.5,
                             Math.random() - 0.5,
                             Math.random() - 0.5
@@ -750,8 +754,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
               planetProp.initialScale.y * currentStarMassFactor,
               planetProp.initialScale.z * currentStarMassFactor
             );
-            if (object3D instanceof THREE.Mesh || object3D instanceof THREE.Group) {
-                 object3D.quaternion.slerp(new THREE.Quaternion(), 0.1);
+            if (object3D instanceof THREE_ANIM.Mesh || object3D instanceof THREE_ANIM.Group) {
+                 object3D.quaternion.slerp(new THREE_ANIM.Quaternion(), 0.1);
             }
             
             let effectiveOrbitalDecayRate = CONTINUOUS_ORBITAL_DECAY_RATE;
@@ -776,14 +780,14 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         onStarMassLossRef.current(planetProp.id, STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND * deltaTime);
                     }
 
-                    const starColor = new THREE.Color(planetProp.color);
+                    const starColor = new THREE_ANIM.Color(planetProp.color);
                     for (let i = 0; i < STAR_LIGHT_EMIT_RATE_PER_FRAME; i++) {
                         const pIndex = lastStarEmittedParticleIndexRef.current;
                         const particle = starEmittedParticleDataRef.current[pIndex];
                         if (particle && !particle.active) {
                             particle.active = true;
                             particle.position.copy(object3D.position);
-                            const randomDirection = new THREE.Vector3(
+                            const randomDirection = new THREE_ANIM.Vector3(
                                 Math.random() - 0.5,
                                 Math.random() - 0.5,
                                 Math.random() - 0.5
@@ -807,7 +811,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         object3D.position.set(x, planetProp.yOffset, z);
       });
 
-      if (starEmittedParticlesRef.current && starEmittedParticleMaterialRef.current && starEmittedParticleDataRef.current.length > 0 && THREE) {
+      if (starEmittedParticlesRef.current && starEmittedParticleMaterialRef.current && starEmittedParticleDataRef.current.length > 0 && THREE_ANIM) {
         const positions = starEmittedParticlesRef.current.geometry.attributes.position.array as Float32Array;
         const colors = starEmittedParticlesRef.current.geometry.attributes.color.array as Float32Array;
         let hasActiveStarParticles = false;
@@ -815,7 +819,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         starEmittedParticleDataRef.current.forEach((p, i) => {
             if (p.active && p.life > 0) {
                 hasActiveStarParticles = true;
-                const forceDirection = new THREE.Vector3().subVectors(new THREE.Vector3(0,0,0), p.position);
+                const forceDirection = new THREE_ANIM.Vector3().subVectors(new THREE_ANIM.Vector3(0,0,0), p.position);
                 const distanceSq = Math.max(0.1, p.position.lengthSq());
                 
                 const gravityFactor = p.initialLife > STAR_DISSOLUTION_PARTICLE_LIFESPAN 
@@ -859,7 +863,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       }
 
 
-        if (jetParticlesRef.current && jetMaterialRef.current && jetParticleDataRef.current.length > 0 && THREE) {
+        if (jetParticlesRef.current && jetMaterialRef.current && jetParticleDataRef.current.length > 0 && THREE_ANIM) {
             const positions = jetParticlesRef.current.geometry.attributes.position.array as Float32Array;
             const colorsAttribute = jetParticlesRef.current.geometry.attributes.color.array as Float32Array;
             let activeJets = false;
@@ -886,13 +890,13 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     const coneAngle = Math.random() * Math.PI * 2; 
                     const elevationAngle = (Math.random() * spreadAngle) - (spreadAngle / 2); 
 
-                    let velDir = new THREE.Vector3(
+                    let velDir = new THREE_ANIM.Vector3(
                         Math.sin(elevationAngle) * Math.cos(coneAngle),
                         Math.cos(elevationAngle) * direction, 
                         Math.sin(elevationAngle) * Math.sin(coneAngle)
                     );
                     
-                    const randomOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(0.15);
+                    const randomOffset = new THREE_ANIM.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(0.15);
                     velDir.add(randomOffset);
 
                     p.velocity.copy(velDir.normalize().multiplyScalar(JET_SPEED * (0.7 + Math.random() * 0.6))); 
@@ -913,31 +917,40 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             }
         }
 
-      // Lensing Render Pass
-      renderer.clear(); // Clear main canvas
+      renderer_anim.clear(); 
 
-      // 1. Render background (stars) to starfieldRenderTarget
-      if (starsRef.current) starsRef.current.visible = true; // Make sure stars are visible for this pass
-      renderer.setRenderTarget(rt);
-      renderer.clear();
-      renderer.render(backgroundScene, mainCamera);
-      renderer.setRenderTarget(null);
-      if (starsRef.current) starsRef.current.visible = false; // Hide stars from foreground scene
+      if (starsRef.current) starsRef.current.visible = true; 
+      renderer_anim.setRenderTarget(rt_anim);
+      renderer_anim.clear();
+      renderer_anim.render(bgScene_anim, mainCam_anim);
+      renderer_anim.setRenderTarget(null);
+      if (starsRef.current) starsRef.current.visible = false; 
 
 
-      // 2. Update lensing shader uniforms
-      bh.getWorldPosition(tempVec);
-      tempVec.project(mainCamera); // Project to NDC
-      lMaterial.uniforms.uBlackHolePos.value.set((tempVec.x + 1) / 2, (tempVec.y + 1) / 2);
-      lMaterial.uniforms.uTexture.value = rt.texture;
-      lMaterial.uniforms.uAspectRatio.value = mainCamera.aspect;
+      if (lMaterial_anim && mainCam_anim && bh_anim && rt_anim && THREE_ANIM) {
+        const centerNDC = new THREE_ANIM.Vector3();
+        bh_anim.getWorldPosition(centerNDC); 
+        centerNDC.project(mainCam_anim);
+
+        const R_world = bh_anim.scale.x;
+        const pY1_world = new THREE_ANIM.Vector3(0, R_world, 0);
+        const pY2_world = new THREE_ANIM.Vector3(0, -R_world, 0);
+
+        const pY1_ndc = pY1_world.clone().project(mainCam_anim);
+        const pY2_ndc = pY2_world.clone().project(mainCam_anim);
+        
+        const diameterNDC_Y = Math.abs(pY1_ndc.y - pY2_ndc.y);
+        const radiusUV_Y = diameterNDC_Y / 2.0; // Radius in UV units (0 to 1 for half screen height)
+
+        lMaterial_anim.uniforms.uBlackHoleScreenRadius.value = radiusUV_Y;
+        lMaterial_anim.uniforms.uBlackHolePos.value.set((centerNDC.x + 1) / 2, (centerNDC.y + 1) / 2);
+        lMaterial_anim.uniforms.uTexture.value = rt_anim.texture;
+        lMaterial_anim.uniforms.uAspectRatio.value = mainCam_anim.aspect;
+      }
 
 
-      // 3. Render lensing effect (distorted starfield) to screen
-      renderer.render(lensingScene, lensingCam);
-      
-      // 4. Render foreground scene (black hole, planets, etc.) on top
-      renderer.render(foregroundScene, mainCamera);
+      renderer_anim.render(lensScene_anim, lensCam_anim);
+      renderer_anim.render(fgScene_anim, mainCam_anim);
 
 
     };
@@ -969,7 +982,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       cancelAnimationFrame(animationFrameId);
 
       planetMeshesRef.current.forEach(object => {
-        foregroundSceneRef.current?.remove(object); // Remove from foreground
+        foregroundSceneRef.current?.remove(object); 
         if (object instanceof THREE_TYPE.Group) {
           object.traverse(child => {
              if (child instanceof THREE_TYPE.Mesh) {
@@ -1006,17 +1019,15 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         }
       }
 
-      // Dispose lensing related objects
       starfieldRenderTargetRef.current?.dispose();
       lensingQuadRef.current?.geometry?.dispose();
       lensingMaterialRef.current?.dispose();
 
 
-      // Dispose foreground scene contents
       foregroundSceneRef.current?.traverse(object => {
-        const THREE = THREEInstanceRef.current;
-        if (!THREE) return;
-        if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
+        const THREE_CLEANUP = THREEInstanceRef.current;
+        if (!THREE_CLEANUP) return;
+        if (object instanceof THREE_CLEANUP.Mesh || object instanceof THREE_CLEANUP.Points || object instanceof THREE_CLEANUP.LineSegments) {
             object.geometry?.dispose();
             const material = object.material as THREE_TYPE.Material | THREE_TYPE.Material[];
             if (material) {
@@ -1029,9 +1040,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
           }
       });
 
-      // Dispose background scene contents (just starsRef)
       backgroundSceneRef.current?.traverse(object => {
-         if (object instanceof THREE_TYPE.Points) {
+         const THREE_CLEANUP_BG = THREEInstanceRef.current;
+         if (!THREE_CLEANUP_BG) return;
+         if (object instanceof THREE_CLEANUP_BG.Points) {
             object.geometry?.dispose();
             (object.material as THREE_TYPE.Material)?.dispose();
          }
@@ -1064,7 +1076,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   }, [blackHoleRadius]);
 
   useEffect(() => {
-    if (foregroundSceneRef.current && THREEInstanceRef.current) { // Ensure foreground scene exists
+    if (foregroundSceneRef.current && THREEInstanceRef.current) { 
        createAndAddAccretionParticles(
         accretionDiskInnerRadius,
         accretionDiskOuterRadius,
@@ -1075,9 +1087,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 
   useEffect(() => {
-    const scene = foregroundSceneRef.current; // Add to foreground scene
-    const THREE = THREEInstanceRef.current;
-    if (!scene || !THREE) return;
+    const scene = foregroundSceneRef.current; 
+    const THREE_PLANETS = THREEInstanceRef.current;
+    if (!scene || !THREE_PLANETS) return;
 
     const currentPlanetObjectIds = new Set(Array.from(planetMeshesRef.current.keys()));
     const incomingPlanetIds = new Set(spawnedPlanets.map(p => p.id));
@@ -1087,18 +1099,18 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       const currentStarMassFactor = (planetProp.type === 'star' ? planetProp.currentMassFactor : 1.0) ?? 1.0;
 
       if (!object3D) {
-        const sphereGeometry = new THREE.SphereGeometry(1, 16, 16);
+        const sphereGeometry = new THREE_PLANETS.SphereGeometry(1, 16, 16);
         let sphereMaterial;
 
         if (planetProp.type === 'star') {
-          const starGroup = new THREE.Group(); 
-          sphereMaterial = new THREE.MeshBasicMaterial({ color: planetProp.color }); 
-          const starSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+          const starGroup = new THREE_PLANETS.Group(); 
+          sphereMaterial = new THREE_PLANETS.MeshBasicMaterial({ color: planetProp.color }); 
+          const starSphere = new THREE_PLANETS.Mesh(sphereGeometry, sphereMaterial);
           starGroup.add(starSphere);
           object3D = starGroup;
         } else { 
-          sphereMaterial = new THREE.MeshStandardMaterial({ color: planetProp.color, roughness: 0.5, metalness: 0.1 });
-          object3D = new THREE.Mesh(sphereGeometry, sphereMaterial);
+          sphereMaterial = new THREE_PLANETS.MeshStandardMaterial({ color: planetProp.color, roughness: 0.5, metalness: 0.1 });
+          object3D = new THREE_PLANETS.Mesh(sphereGeometry, sphereMaterial);
         }
 
         scene.add(object3D);
@@ -1113,16 +1125,16 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         });
       } else {
         
-        if (planetProp.type === 'star' && object3D instanceof THREE.Group) {
-            const starSphere = object3D.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh;
-            if (starSphere && starSphere.material instanceof THREE.MeshBasicMaterial) {
-                if (starSphere.material.color.getHexString() !== new THREE.Color(planetProp.color).getHexString()){
+        if (planetProp.type === 'star' && object3D instanceof THREE_PLANETS.Group) {
+            const starSphere = object3D.children.find(child => child instanceof THREE_PLANETS.Mesh) as THREE_TYPE.Mesh;
+            if (starSphere && starSphere.material instanceof THREE_PLANETS.MeshBasicMaterial) {
+                if (starSphere.material.color.getHexString() !== new THREE_PLANETS.Color(planetProp.color).getHexString()){
                     starSphere.material.color.set(planetProp.color);
                 }
             }
-        } else if (planetProp.type === 'planet' && object3D instanceof THREE.Mesh) {
-            if (object3D.material instanceof THREE.MeshStandardMaterial) { 
-                 if (object3D.material.color.getHexString() !== new THREE.Color(planetProp.color).getHexString()){
+        } else if (planetProp.type === 'planet' && object3D instanceof THREE_PLANETS.Mesh) {
+            if (object3D.material instanceof THREE_PLANETS.MeshStandardMaterial) { 
+                 if (object3D.material.color.getHexString() !== new THREE_PLANETS.Color(planetProp.color).getHexString()){
                     object3D.material.color.set(planetProp.color);
                 }
             }
@@ -1160,10 +1172,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       if (!incomingPlanetIds.has(id)) {
         const object3D = planetMeshesRef.current.get(id);
         if (object3D) {
-          scene.remove(object3D); // Remove from foreground scene
-          if (object3D instanceof THREE.Group) { 
+          scene.remove(object3D); 
+          if (object3D instanceof THREE_PLANETS.Group) { 
             object3D.traverse(child => {
-              if (child instanceof THREE.Mesh) {
+              if (child instanceof THREE_PLANETS.Mesh) {
                 child.geometry?.dispose();
                 if (Array.isArray(child.material)) {
                   child.material.forEach(m => m.dispose());
@@ -1172,7 +1184,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 }
               }
             });
-          } else if (object3D instanceof THREE.Mesh) { 
+          } else if (object3D instanceof THREE_PLANETS.Mesh) { 
             object3D.geometry?.dispose();
              if (object3D.material) { (object3D.material as THREE_TYPE.Material).dispose(); }
           }
