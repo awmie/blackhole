@@ -532,6 +532,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     );
     starfieldRenderTargetRef.current.texture.minFilter = THREE.LinearFilter;
     starfieldRenderTargetRef.current.texture.magFilter = THREE.LinearFilter;
+    starfieldRenderTargetRef.current.texture.wrapS = THREE.ClampToEdgeWrapping;
+    starfieldRenderTargetRef.current.texture.wrapT = THREE.ClampToEdgeWrapping;
 
 
     const controls = new OrbitControls(camera, renderer.domElement);
