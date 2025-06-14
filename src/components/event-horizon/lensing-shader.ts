@@ -31,7 +31,7 @@ export const lensingShader = {
       
       // Prevent division by zero or extreme distortion at the very center
       float lensFactor = smoothstep(0.0, 0.5, dist); // Gradually increase effect from center
-      float_t lensedDist = dist + uStrength / (dist + 0.01) * lensFactor;
+      float lensedDist = dist + uStrength / (dist + 0.01) * lensFactor;
 
       vec2 dir = normalize(centeredUv);
       vec2 distortedUv = uBlackHolePos + dir * lensedDist / vec2(uAspectRatio, 1.0);
