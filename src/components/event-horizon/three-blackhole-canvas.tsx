@@ -32,10 +32,10 @@ interface ThreeBlackholeCanvasProps {
 }
 
 const NUM_PARTICLES = 50000;
-const baseAngularSpeed = 1.0; // For accretion disk
-const minAngularSpeedFactor = 0.02; // For accretion disk
+const baseAngularSpeed = 1.0; 
+const minAngularSpeedFactor = 0.02; 
 const photonRingThreshold = 0.03;
-const PULL_IN_FACTOR = 0.05; // For spawned objects being pulled in
+const PULL_IN_FACTOR = 0.1; // Increased from 0.05
 
 interface DiskParticleData {
   radius: number;
@@ -71,8 +71,8 @@ float fbm(vec2 st) {
     float frequency = 2.0;
     for (int i = 0; i < 6; i++) {
         value += amplitude * simpleNoise(st * frequency);
-        st *= 2.2;
-        amplitude *= 0.4;
+        st *= 2.2; // Increase for more detail/swirl
+        amplitude *= 0.4; // Attenuate amplitude
     }
     return value;
 }
@@ -81,32 +81,40 @@ void main() {
   vec3 normal = normalize(v_normal);
   vec3 viewDir = normalize(u_cameraPosition - v_worldPosition);
 
-  float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 7.0) * 3.5;
-  fresnel = clamp(fresnel, 0.0, 1.0);
+  // Sharper Fresnel: higher power, potentially higher multiplier for intensity at edges
+  float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 7.0) * 3.5; // Was 5.0, 1.5. Try higher power for sharper falloff
+  fresnel = clamp(fresnel, 0.0, 1.0); // Clamp to ensure it's a factor between 0 and 1
 
-  float timeFactor = u_time * 0.07;
+  // Time factor for animation
+  float timeFactor = u_time * 0.07; // Slower base time for more controlled chaos
 
-  vec2 noiseCoordBase1 = v_worldPosition.xz * 0.7 + timeFactor * 0.06;
-  noiseCoordBase1.x += sin(v_worldPosition.y * 18.0 + timeFactor * 0.25) * 0.35;
+  // More complex noise coordinates
+  vec2 noiseCoordBase1 = v_worldPosition.xz * 0.7 + timeFactor * 0.06; // Base swirl on xz plane
+  noiseCoordBase1.x += sin(v_worldPosition.y * 18.0 + timeFactor * 0.25) * 0.35; // Add y-dependent wave
 
-  vec2 noiseCoordBase2 = v_worldPosition.yx * 1.2 - timeFactor * 0.04;
-  noiseCoordBase2.y += cos(v_worldPosition.z * 14.0 - timeFactor * 0.18) * 0.3;
+  vec2 noiseCoordBase2 = v_worldPosition.yx * 1.2 - timeFactor * 0.04; // Another layer, different orientation
+  noiseCoordBase2.y += cos(v_worldPosition.z * 14.0 - timeFactor * 0.18) * 0.3; // Add z-dependent wave
 
+  // Generate noise values
   float noiseVal1 = fbm(noiseCoordBase1);
-  float noiseVal2 = fbm(noiseCoordBase2 * 1.4 + vec2(sin(timeFactor*0.12), cos(timeFactor*0.12)) * 0.6);
+  float noiseVal2 = fbm(noiseCoordBase2 * 1.4 + vec2(sin(timeFactor*0.12), cos(timeFactor*0.12)) * 0.6); // Offset second noise for variation
 
-  float radialDist = length(v_worldPosition.xy);
-  float edgeFactor = smoothstep(0.75, 1.0, radialDist);
+  // Combine noise, ensuring it's more prominent at edges
+  float radialDist = length(v_worldPosition.xy); // Or use .xz if sphere is aligned differently, or just length(v_worldPosition) for pure radial
+  float edgeFactor = smoothstep(0.75, 1.0, radialDist); // Make noise stronger towards the actual edge of the sphere geometry
+  
+  float combinedNoise = (noiseVal1 * 0.55 + noiseVal2 * 0.45) * (0.4 + edgeFactor * 0.6); // Weight noise influence by edgeFactor
+  combinedNoise = smoothstep(0.25, 0.75, combinedNoise); // Smooth the noise for better visual appeal
 
-  float combinedNoise = (noiseVal1 * 0.55 + noiseVal2 * 0.45) * (0.4 + edgeFactor * 0.6);
-  combinedNoise = smoothstep(0.25, 0.75, combinedNoise);
+  // Define colors
+  vec3 coreColor = vec3(0.0, 0.0, 0.0); // Black core
+  vec3 lensedLightColor = vec3(1.0, 0.8, 0.9); // Bright, accretion-disk inspired pinkish-white
 
-  vec3 coreColor = vec3(0.0, 0.0, 0.0);
-  vec3 lensedLightColor = vec3(1.0, 0.8, 0.9);
+  // Modulate lensed light by Fresnel and noise, ensure high intensity at edges
+  float effectIntensity = fresnel * combinedNoise * 2.5; // Increase multiplier for more intensity (was 1.5)
 
-  float effectIntensity = fresnel * combinedNoise * 2.5;
-
-  vec3 finalColor = mix(coreColor, lensedLightColor, clamp(effectIntensity, 0.0, 1.0));
+  // Mix core black with lensed light
+  vec3 finalColor = mix(coreColor, lensedLightColor, clamp(effectIntensity, 0.0, 1.0)); // Ensure effectIntensity doesn't overblow beyond 1.0
 
   gl_FragColor = vec4(finalColor, 1.0);
 }
@@ -148,6 +156,17 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   const jetParticleDataRef = useRef<JetParticleState[]>([]);
   const jetMaterialRef = useRef<THREE.PointsMaterial | null>(null);
 
+  const onShiftClickSpawnAtPointRef = useRef(onShiftClickSpawnAtPoint);
+  const onCameraUpdateRef = useRef(onCameraUpdate);
+
+  useEffect(() => {
+    onShiftClickSpawnAtPointRef.current = onShiftClickSpawnAtPoint;
+  }, [onShiftClickSpawnAtPoint]);
+
+  useEffect(() => {
+    onCameraUpdateRef.current = onCameraUpdate;
+  }, [onCameraUpdate]);
+
 
   const createAndAddAccretionParticles = useCallback((
     scene: THREE.Scene,
@@ -164,13 +183,13 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     const particlesGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(NUM_PARTICLES * 3);
-    const colors = new Float32Array(NUM_PARTICLES * 4);
+    const colors = new Float32Array(NUM_PARTICLES * 4); 
     diskParticleDataRef.current = [];
 
-    const colorInner = new THREE.Color(1.0, 0.4, 0.8);
-    const colorMid = new THREE.Color(0.6, 0.3, 0.9);
+    const colorInner = new THREE.Color(1.0, 0.4, 0.8); 
+    const colorMid = new THREE.Color(0.6, 0.3, 0.9); 
     const colorOuter = new THREE.Color(0.2, 0.1, 0.7);
-    const colorPhotonRing = new THREE.Color(1.0, 0.95, 0.85);
+    const colorPhotonRing = new THREE.Color(1.0, 0.95, 0.85); 
     const outerFadeStartNormalized = 0.7;
 
     for (let i = 0; i < NUM_PARTICLES; i++) {
@@ -183,7 +202,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       let normalizedDist = (radius - innerR) / (outerR - innerR);
       normalizedDist = Math.max(0, Math.min(1, normalizedDist));
 
-      let angularVelocity = baseAngularSpeed * Math.pow(innerR / radius, 2.5);
+      let angularVelocity = baseAngularSpeed * Math.pow(innerR / radius, 2.5); // Steeper falloff
       angularVelocity = Math.max(angularVelocity, baseAngularSpeed * minAngularSpeedFactor);
 
       diskParticleDataRef.current.push({ radius, angle, angularVelocity, yOffset });
@@ -201,14 +220,16 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
       if (normalizedDist < photonRingThreshold) {
         let photonRingIntensity = (photonRingThreshold - normalizedDist) / photonRingThreshold;
-        photonRingIntensity = Math.pow(photonRingIntensity, 1.5);
+        photonRingIntensity = Math.pow(photonRingIntensity, 1.5); // Power up for more intensity
         particleColor.lerp(colorPhotonRing, photonRingIntensity);
-
+        
+        // Make photon ring brighter
         particleColor.r = Math.min(1.0, particleColor.r + photonRingIntensity * 2.5);
         particleColor.g = Math.min(1.0, particleColor.g + photonRingIntensity * 2.5);
         particleColor.b = Math.min(1.0, particleColor.b + photonRingIntensity * 2.5);
       } else {
-        const innerEdgeFactor = 1.0 - Math.min(1.0, Math.max(0.0, (normalizedDist - photonRingThreshold) / 0.15));
+        // Slightly brighten particles just outside the photon ring for a smoother transition
+        const innerEdgeFactor = 1.0 - Math.min(1.0, Math.max(0.0, (normalizedDist - photonRingThreshold) / 0.15)); // transition over 15% of disk width
          if (innerEdgeFactor > 0) {
             particleColor.r = Math.min(1.0, particleColor.r + innerEdgeFactor * 0.8);
             particleColor.g = Math.min(1.0, particleColor.g + innerEdgeFactor * 0.8);
@@ -216,25 +237,26 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         }
       }
 
+
       colors[i4] = particleColor.r;
       colors[i4 + 1] = particleColor.g;
       colors[i4 + 2] = particleColor.b;
-
+      
       let particleAlpha = opacity;
       if (normalizedDist > outerFadeStartNormalized) {
         particleAlpha *= (1.0 - (normalizedDist - outerFadeStartNormalized) / (1.0 - outerFadeStartNormalized));
       }
-      colors[i4 + 3] = Math.max(0.0, Math.min(1.0, particleAlpha));
+      colors[i4 + 3] = Math.max(0.0, Math.min(1.0, particleAlpha)); // Ensure alpha is between 0 and 1
     }
 
     particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 4)); // Now 4 components (RGBA)
 
     const particlesMaterial = new THREE.PointsMaterial({
-      size: 0.01,
+      size: 0.01, // Adjust particle size if needed
       vertexColors: true,
       transparent: true,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.AdditiveBlending, // Good for bright, glowing particles
       depthWrite: false,
       sizeAttenuation: true,
     });
@@ -258,8 +280,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     jetParticleDataRef.current = [];
     for (let i = 0; i < JET_PARTICLE_COUNT; i++) {
-        const life = 0;
-        const initialLife = JET_LIFESPAN * (0.5 + Math.random() * 0.5);
+        const life = 0; // Start dead, will be revived by emission logic
+        const initialLife = JET_LIFESPAN * (0.5 + Math.random() * 0.5); // Randomize lifespan slightly
 
         jetParticleDataRef.current.push({
             id: i,
@@ -267,10 +289,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             velocity: new THREE.Vector3(),
             life,
             initialLife,
-            color: new THREE.Color(1,1,1),
-            size: 0.02 + Math.random() * 0.03,
+            color: new THREE.Color(1,1,1), // Base color, will be set during emission
+            size: 0.02 + Math.random() * 0.03, // Randomize size
         });
-        positions[i*3] = 0; positions[i*3+1] = 0; positions[i*3+2] = 0;
+        positions[i*3] = 0; positions[i*3+1] = 0; positions[i*3+2] = 0; // Initial off-screen
         colorsAttribute[i*3] = 1; colorsAttribute[i*3+1] = 1; colorsAttribute[i*3+2] = 1;
     }
 
@@ -278,7 +300,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colorsAttribute, 3));
 
     jetMaterialRef.current = new THREE.PointsMaterial({
-        size: 0.05,
+        size: 0.05, // Base size for jet particles
         vertexColors: true,
         transparent: true,
         blending: THREE.AdditiveBlending,
@@ -287,21 +309,21 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     });
 
     jetParticlesRef.current = new THREE.Points(geometry, jetMaterialRef.current);
-    jetParticlesRef.current.visible = false;
+    jetParticlesRef.current.visible = false; // Initially hidden
     scene.add(jetParticlesRef.current);
   }, []);
 
 
   useEffect(() => {
-    if (!mountRef.current || !rendererRef.current) return;
+    if (!mountRef.current || !rendererRef.current) return; // Ensure renderer is initialized
 
     const scene = sceneRef.current;
-    if (!scene) return;
+    if (!scene) return; // Should not happen if renderer is present
 
     initJetParticles(scene);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rendererRef.current]);
+  }, [rendererRef.current]); // Re-init if renderer changes (shouldn't normally)
 
 
   useEffect(() => {
@@ -322,7 +344,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     if (onCameraReady) {
       onCameraReady(camera);
     }
-    onCameraUpdate({ x: camera.position.x, y: camera.position.y, z: camera.position.z });
+    if (onCameraUpdateRef.current) {
+       onCameraUpdateRef.current({ x: camera.position.x, y: camera.position.y, z: camera.position.z });
+    }
+
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
@@ -339,18 +364,18 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     controlsRef.current = controls;
 
     controls.addEventListener('change', () => {
-      if (cameraRef.current) {
-        onCameraUpdate({ x: cameraRef.current.position.x, y: cameraRef.current.position.y, z: cameraRef.current.position.z });
+      if (cameraRef.current && onCameraUpdateRef.current) {
+        onCameraUpdateRef.current({ x: cameraRef.current.position.x, y: cameraRef.current.position.y, z: cameraRef.current.position.z });
       }
     });
 
-    const blackHoleGeometry = new THREE.SphereGeometry(1, 64, 64);
+    const blackHoleGeometry = new THREE.SphereGeometry(1, 64, 64); // Unit sphere
     blackHoleMaterialRef.current = new THREE.ShaderMaterial({
       vertexShader: blackHoleVertexShader,
       fragmentShader: blackHoleFragmentShader,
       uniforms: {
         u_time: { value: 0.0 },
-        u_cameraPosition: { value: camera.position }
+        u_cameraPosition: { value: camera.position } // Initialize with camera position
       },
     });
     const blackHoleMesh = new THREE.Mesh(blackHoleGeometry, blackHoleMaterialRef.current);
@@ -361,8 +386,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     const starsGeometry = new THREE.BufferGeometry();
     const starVertices = [];
-    for (let i = 0; i < 150000; i++) {
-        const r = 200 + Math.random() * 600;
+    for (let i = 0; i < 150000; i++) { // Increased star count for denser background
+        const r = 200 + Math.random() * 600; // Stars further out
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
         starVertices.push(r * Math.sin(theta) * Math.cos(phi), r * Math.sin(theta) * Math.sin(phi), r * Math.cos(theta));
@@ -383,7 +408,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     const currentRendererDomElement = renderer.domElement;
     const handleCanvasShiftClick = (event: PointerEvent) => {
-      if (!event.shiftKey || !cameraRef.current || !onShiftClickSpawnAtPoint) return;
+      if (!event.shiftKey || !cameraRef.current || !onShiftClickSpawnAtPointRef.current) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -396,11 +421,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouse, cameraRef.current);
 
-      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      // Raycast against a plane at y=0 (the accretion disk plane)
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Plane normal pointing up, at y=0
       const intersectionPoint = new THREE.Vector3();
 
       if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
-        onShiftClickSpawnAtPoint(intersectionPoint);
+        onShiftClickSpawnAtPointRef.current(intersectionPoint);
       }
     };
     currentRendererDomElement.addEventListener('pointerdown', handleCanvasShiftClick);
@@ -428,6 +454,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
           pData.angle += pData.angularVelocity * deltaTime;
           const i3 = i * 3;
           positions[i3] = pData.radius * Math.cos(pData.angle);
+          // positions[i3 + 1] = pData.yOffset; // yOffset is static
           positions[i3 + 2] = pData.radius * Math.sin(pData.angle);
 
         }
@@ -445,10 +472,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
         let currentOrbitRadius = planet.orbitRadius;
 
-        if (planet.isStretching || planet.timeToLive < 10) {
+        // Pull in factor activated by stretching OR low timeToLive
+        if (planet.isStretching || planet.timeToLive < 10) { // Check timeToLive as well
+            // The pull-in factor is stronger for objects with less timeToLive
             currentOrbitRadius -= PULL_IN_FACTOR * blackHoleRadius * deltaTime * (10 / Math.max(1, planet.timeToLive));
-            currentOrbitRadius = Math.max(currentOrbitRadius, blackHoleRadius * 0.5);
-            planet.orbitRadius = currentOrbitRadius;
+            currentOrbitRadius = Math.max(currentOrbitRadius, blackHoleRadius * 0.5); // Don't go beyond half BH radius before absorption
+            planet.orbitRadius = currentOrbitRadius; // Persist the new radius
         }
 
 
@@ -456,18 +485,22 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         const z = currentOrbitRadius * Math.sin(planet.currentAngle);
         mesh.position.set(x, planet.yOffset, z);
 
-        const distanceToCenterSq = x*x + planet.yOffset*planet.yOffset + z*z;
+        const distanceToCenterSq = x*x + planet.yOffset*planet.yOffset + z*z; // Use squared distance for efficiency
         const blackHoleRadiusSq = blackHoleRadius * blackHoleRadius;
 
-        if (distanceToCenterSq < blackHoleRadiusSq * 1.5 * 1.5 && !planet.isStretching) {
+        // Start stretching when closer
+        if (distanceToCenterSq < blackHoleRadiusSq * 1.5 * 1.5 && !planet.isStretching) { // 1.5x BH radius to start stretching
             planet.isStretching = true;
+            // Initial stretch axis towards the black hole.
+            // This will be refined by aligning with the direction of motion / radial direction.
             const radialDir = new THREE.Vector3(x, planet.yOffset, z).normalize();
             planet.stretchAxis = {x: -radialDir.x, y: -radialDir.y, z: -radialDir.z };
         }
 
         if (planet.isStretching) {
-            const stretchFactor = Math.min(5, 1 + (blackHoleRadiusSq / Math.max(distanceToCenterSq, 0.01)) * 2);
-            const squashFactor = 1 / Math.sqrt(stretchFactor);
+            // Spaghettification effect: Stretch along direction to black hole, squash perpendicular
+            const stretchFactor = Math.min(5, 1 + (blackHoleRadiusSq / Math.max(distanceToCenterSq, 0.01)) * 2); // Stronger stretch closer
+            const squashFactor = 1 / Math.sqrt(stretchFactor); // Conserve volume approx.
 
             mesh.scale.set(
                 planet.initialScale.x * squashFactor,
@@ -475,41 +508,42 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 planet.initialScale.z * squashFactor
             );
 
-            const toOrigin = mesh.position.clone().normalize().multiplyScalar(-1);
-            const currentUp = new THREE.Vector3(0,1,0); // Assuming initial up is Y
-            // If stretchAxis is significant, use it. Otherwise, default to radial.
+            // Align the object's "length" (e.g., its local Y or Z axis) towards the black hole
+            const toOrigin = mesh.position.clone().normalize().multiplyScalar(-1); // Vector from mesh to origin (black hole)
+            const currentUp = new THREE.Vector3(0,1,0); // Assuming initial "up" of sphere is Y axis.
+                                                       // For proper spaghettification, this should be an axis perpendicular to 'toOrigin'
+                                                       // and also somewhat aligned with its orbital velocity.
+
+            // More robust spaghettification: align local Z-axis with the direction to the black hole.
+            // Find a quaternion that rotates the object's local Z-axis to point towards the black hole.
             let targetDir = toOrigin;
             if (Math.abs(planet.stretchAxis.x) + Math.abs(planet.stretchAxis.y) + Math.abs(planet.stretchAxis.z) > 0.1) {
-                 // Convert planet.stretchAxis (object) to THREE.Vector3 and normalize
                 const stretchDir = new THREE.Vector3(planet.stretchAxis.x, planet.stretchAxis.y, planet.stretchAxis.z).normalize();
-                targetDir = stretchDir;
+                targetDir = stretchDir; // Use defined stretch axis if significant
             }
 
-            const quaternion = new THREE.Quaternion().setFromUnitVectors(currentUp, targetDir);
-            mesh.quaternion.slerp(quaternion, 0.1);
 
-            // Apply stretch along the most dominant axis of the targetDir (which is usually radial or defined stretchAxis)
-            // This is a simplification. True spaghettification aligns with tidal forces.
-            if (Math.abs(targetDir.x) > Math.abs(targetDir.y) && Math.abs(targetDir.x) > Math.abs(targetDir.z)) {
-                 mesh.scale.x *= stretchFactor / squashFactor; // Undo squash and apply stretch
-            } else if (Math.abs(targetDir.y) > Math.abs(targetDir.z)) {
-                 mesh.scale.y *= stretchFactor / squashFactor;
-            } else {
-                 mesh.scale.z *= stretchFactor / squashFactor;
-            }
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetDir); // Assuming Z is length
+            mesh.quaternion.slerp(quaternion, 0.1); // Smoothly rotate
+
+            // Apply stretch along the aligned axis (now Z after rotation)
+            mesh.scale.z *= stretchFactor / squashFactor; // Undo squash on Z and apply stretch
 
 
         } else {
+            // Reset scale if not stretching (or implement gradual "unstretching")
             mesh.scale.set(planet.currentScale.x, planet.currentScale.y, planet.currentScale.z);
         }
 
 
-        if (distanceToCenterSq < blackHoleRadiusSq * 0.8 || planet.timeToLive <= 0) {
+        // Absorption condition
+        if (distanceToCenterSq < blackHoleRadiusSq * 0.8 || planet.timeToLive <= 0) { // Absorb if very close or TTL expired
           onAbsorbPlanet(planet.id);
         }
       });
 
 
+        // Jet particle animation
         if (jetParticlesRef.current && jetMaterialRef.current && jetParticleDataRef.current.length > 0) {
             const positions = jetParticlesRef.current.geometry.attributes.position.array as Float32Array;
             const colorsAttribute = jetParticlesRef.current.geometry.attributes.color.array as Float32Array;
@@ -518,42 +552,44 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             jetParticleDataRef.current.forEach((p, i) => {
                 if (p.life > 0) {
                     p.position.addScaledVector(p.velocity, deltaTime);
-                    p.life -= deltaTime / p.initialLife;
+                    p.life -= deltaTime / p.initialLife; // Normalized fade based on initial life
 
                     positions[i * 3] = p.position.x;
                     positions[i * 3 + 1] = p.position.y;
                     positions[i * 3 + 2] = p.position.z;
 
-                    const fade = Math.max(0, p.life);
+                    const fade = Math.max(0, p.life); // Ensure fade is not negative
                     colorsAttribute[i * 3] = p.color.r * fade;
                     colorsAttribute[i * 3 + 1] = p.color.g * fade;
                     colorsAttribute[i * 3 + 2] = p.color.b * fade;
                     activeJets = true;
-                } else if (isEmittingJets && Math.random() < 0.1) {
-                    const direction = Math.random() > 0.5 ? 1 : -1;
-                    p.position.set(0, direction * blackHoleRadius * 1.1, 0);
+                } else if (isEmittingJets && Math.random() < 0.1) { // Only revive particles if jets are active and by chance
+                    const direction = Math.random() > 0.5 ? 1 : -1; // Up or down
+                    p.position.set(0, direction * blackHoleRadius * 1.1, 0); // Start just outside BH poles
 
-                    const spreadAngle = Math.PI / 8;
-                    const coneAngle = Math.random() * Math.PI * 2;
-                    const elevationAngle = (Math.random() * spreadAngle) - (spreadAngle / 2);
+                    // Create a cone-like emission for jets
+                    const spreadAngle = Math.PI / 8; // Narrow cone
+                    const coneAngle = Math.random() * Math.PI * 2; // Random direction within the cone base
+                    const elevationAngle = (Math.random() * spreadAngle) - (spreadAngle / 2); // Slight variation from direct pole
 
                     const jetAxis = new THREE.Vector3(0, direction, 0);
                     p.velocity.set(
                         Math.sin(elevationAngle) * Math.cos(coneAngle),
-                        Math.cos(elevationAngle) * direction,
+                        Math.cos(elevationAngle) * direction, // Predominantly along Y-axis
                         Math.sin(elevationAngle) * Math.sin(coneAngle)
-                    ).normalize().multiplyScalar(JET_SPEED * (0.8 + Math.random() * 0.4));
+                    ).normalize().multiplyScalar(JET_SPEED * (0.8 + Math.random() * 0.4)); // Vary speed slightly
 
-                    p.life = 1.0;
-                    p.initialLife = JET_LIFESPAN * (0.7 + Math.random() * 0.6);
-                    p.color.setHSL(Math.random() * 0.1 + 0.55, 0.9, 0.7);
+                    p.life = 1.0; // Reset life
+                    p.initialLife = JET_LIFESPAN * (0.7 + Math.random() * 0.6); // New lifespan
+                    p.color.setHSL(Math.random() * 0.1 + 0.55, 0.9, 0.7); // Bluish-white energetic color
                     activeJets = true;
                 } else {
+                    // Keep dead particles off-screen or invisible
                     positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0;
                     colorsAttribute[i * 3] = 0; colorsAttribute[i * 3 + 1] = 0; colorsAttribute[i * 3 + 2] = 0;
                 }
             });
-            jetParticlesRef.current.visible = activeJets || isEmittingJets;
+            jetParticlesRef.current.visible = activeJets || isEmittingJets; // Keep visible if any particle is alive or emission is flagged
             jetParticlesRef.current.geometry.attributes.position.needsUpdate = true;
             jetParticlesRef.current.geometry.attributes.color.needsUpdate = true;
         }
@@ -580,6 +616,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         currentRendererDomElement.removeEventListener('pointerdown', handleCanvasShiftClick);
       }
       cancelAnimationFrame(animationFrameId);
+      // Dispose planet meshes
       planetMeshesRef.current.forEach(mesh => {
         mesh.geometry.dispose();
         (mesh.material as THREE.Material).dispose();
@@ -587,12 +624,14 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       });
       planetMeshesRef.current.clear();
 
+      // Dispose jet particles
       if (jetParticlesRef.current) {
         scene.remove(jetParticlesRef.current);
         jetParticlesRef.current.geometry.dispose();
         (jetParticlesRef.current.material as THREE.Material).dispose();
       }
 
+      // General scene cleanup
       sceneRef.current?.traverse(object => {
         if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
           object.geometry?.dispose();
@@ -603,31 +642,35 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
           }
         }
       });
-      if (mountRef.current && rendererRef.current) {
+      if (mountRef.current && rendererRef.current) { // Check mountRef.current before trying to remove child
         mountRef.current.removeChild(rendererRef.current.domElement);
       }
       rendererRef.current?.dispose();
-      diskParticleDataRef.current = [];
+      diskParticleDataRef.current = []; // Clear disk particle data
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onShiftClickSpawnAtPoint]);
+  }, [createAndAddAccretionParticles, initJetParticles, onCameraReady]); // Main setup effect dependencies
 
   useEffect(() => {
     if (blackHoleRef.current) {
       blackHoleRef.current.scale.set(blackHoleRadius, blackHoleRadius, blackHoleRadius);
     }
     if (controlsRef.current) {
-        controlsRef.current.minDistance = blackHoleRadius * 1.2;
+        controlsRef.current.minDistance = blackHoleRadius * 1.2; // Adjust min zoom based on BH size
     }
+    // If camera is too close after BH radius change, move it out
      if (cameraRef.current && cameraRef.current.position.length() < blackHoleRadius * 1.2) {
         const newPos = cameraRef.current.position.clone().normalize().multiplyScalar(blackHoleRadius * 1.2);
         cameraRef.current.position.copy(newPos);
-        onCameraUpdate({x: newPos.x, y: newPos.y, z:newPos.z});
+        if (onCameraUpdateRef.current) {
+            onCameraUpdateRef.current({x: newPos.x, y: newPos.y, z:newPos.z});
+        }
     }
-  }, [blackHoleRadius, onCameraUpdate]);
+  }, [blackHoleRadius]);
 
   useEffect(() => {
     if (sceneRef.current) {
+      // Recreate accretion disk particles when radii or opacity change
        createAndAddAccretionParticles(
         sceneRef.current,
         accretionDiskInnerRadius,
@@ -636,17 +679,20 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accretionDiskInnerRadius, accretionDiskOuterRadius, createAndAddAccretionParticles]);
+  }, [accretionDiskInnerRadius, accretionDiskOuterRadius, createAndAddAccretionParticles]); // createAndAddAccretionParticles is stable
 
   useEffect(() => {
-    if (accretionDiskRef.current?.material) {
-       if (sceneRef.current) {
+    // This effect specifically handles opacity changes by recreating the disk.
+    // This is because opacity is baked into vertex colors for fading effect.
+    if (accretionDiskRef.current?.material) { // Check if disk exists
+       if (sceneRef.current) { // Check if scene exists
             createAndAddAccretionParticles(sceneRef.current, accretionDiskInnerRadius, accretionDiskOuterRadius, accretionDiskOpacity);
        }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accretionDiskOpacity, createAndAddAccretionParticles]);
+  }, [accretionDiskOpacity, createAndAddAccretionParticles]); // createAndAddAccretionParticles is stable
 
+  // Effect for managing spawned planets/stars meshes
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
@@ -654,9 +700,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     const currentMeshIds = Array.from(planetMeshesRef.current.keys());
     const planetIds = spawnedPlanets.map(p => p.id);
 
+    // Add or update meshes
     spawnedPlanets.forEach(planet => {
       if (!planetMeshesRef.current.has(planet.id)) {
-        const geometry = new THREE.SphereGeometry(1, 16, 16);
+        const geometry = new THREE.SphereGeometry(1, 16, 16); // Unit sphere
         let material;
         if (planet.type === 'star') {
           material = new THREE.MeshBasicMaterial({ color: planet.color });
@@ -668,11 +715,13 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         scene.add(mesh);
         planetMeshesRef.current.set(planet.id, mesh);
       } else {
+        // If object type could change dynamically (not current feature), handle material swap here
         const mesh = planetMeshesRef.current.get(planet.id);
         if (mesh) {
-          // Ensure material type matches if object type changes (though not currently supported)
+          // Example: update color if it can change
           const expectedMaterialType = planet.type === 'star' ? THREE.MeshBasicMaterial : THREE.MeshStandardMaterial;
           if (!(mesh.material instanceof expectedMaterialType)) {
+             // Material type changed, recreate material
              if (planet.type === 'star') {
                 mesh.material = new THREE.MeshBasicMaterial({ color: planet.color });
              } else {
@@ -680,7 +729,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
              }
           } else {
             // Just update color if material type is correct
-            if ((mesh.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.getHexString() !== planet.color.substring(1)) {
+            if ((mesh.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.getHexString() !== planet.color.substring(1)) { // Color is hex string
                 (mesh.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.set(planet.color);
             }
           }
@@ -688,6 +737,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       }
     });
 
+    // Remove old meshes
     currentMeshIds.forEach(id => {
       if (!planetIds.includes(id)) {
         const mesh = planetMeshesRef.current.get(id);
