@@ -22,6 +22,63 @@ interface ParticleData {
   yOffset: number;
 }
 
+// Vertex Shader for the Black Hole
+const blackHoleVertexShader = `
+varying vec3 v_worldPosition;
+varying vec3 v_normal;
+// cameraPosition is a built-in uniform from Three.js
+
+void main() {
+  vec4 worldPos = modelMatrix * vec4(position, 1.0);
+  v_worldPosition = worldPos.xyz;
+  v_normal = normalize(mat3(modelMatrix) * normal);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+// Fragment Shader for the Black Hole
+const blackHoleFragmentShader = `
+varying vec3 v_worldPosition;
+varying vec3 v_normal;
+uniform float u_time;
+uniform vec3 u_cameraPosition; // Explicitly declare if cameraPosition built-in is problematic
+
+// Simple procedural noise function (hash)
+float simpleNoise(vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+}
+
+void main() {
+  vec3 normal = normalize(v_normal);
+  // Use u_cameraPosition if built-in cameraPosition is not working as expected in varying
+  // For now, assuming cameraPosition (built-in) can be used directly or passed if needed.
+  // If using an explicit uniform: vec3 viewDir = normalize(u_cameraPosition - v_worldPosition);
+  vec3 viewDir = normalize(cameraPosition - v_worldPosition);
+
+
+  // Fresnel effect: stronger at glancing angles (edges of the sphere)
+  float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 3.0); // Power controls sharpness of edge
+
+  // Animated procedural noise for distortion effect
+  vec2 noiseCoordBase = v_worldPosition.xy * 0.4 + u_time * 0.03;
+  float noiseVal = simpleNoise(noiseCoordBase + simpleNoise(noiseCoordBase * 1.5 + u_time * 0.015)); // Layered noise
+  noiseVal = smoothstep(0.25, 0.75, noiseVal); // Smooth the noise
+
+  // Base color is black
+  vec3 color = vec3(0.0, 0.0, 0.0);
+
+  // Lensed light color (e.g., a dim, desaturated blue/purple or whitish)
+  vec3 lensedLightColor = vec3(0.3, 0.3, 0.6); 
+  
+  // Mix the black color with the lensed light color based on fresnel and noise
+  // This effect should be subtle and mostly at the edges.
+  color = mix(color, lensedLightColor, fresnel * noiseVal * 0.4); 
+
+  gl_FragColor = vec4(color, 1.0);
+}
+`;
+
+
 const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   blackHoleRadius,
   accretionDiskInnerRadius,
@@ -59,7 +116,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     const particlesGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(NUM_PARTICLES * 3);
-    const colors = new Float32Array(NUM_PARTICLES * 4); // Changed to 4 components for RGBA
+    const colors = new Float32Array(NUM_PARTICLES * 4); 
     particleDataRef.current = [];
 
     const colorInner = new THREE.Color(1.0, 0.4, 0.8); 
@@ -69,11 +126,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     const baseAngularSpeed = 0.4; 
     const minAngularSpeedFactor = 0.05; 
-    const outerFadeStartNormalized = 0.7; // Start fading from 70% of the disk radius outwards
+    const outerFadeStartNormalized = 0.7; 
 
     for (let i = 0; i < NUM_PARTICLES; i++) {
       const i3 = i * 3;
-      const i4 = i * 4; // Index for RGBA colors
+      const i4 = i * 4; 
       const radius = Math.random() * (outerR - innerR) + innerR;
       const angle = Math.random() * Math.PI * 2;
       const yOffset = (Math.random() - 0.5) * 0.15;
@@ -128,23 +185,22 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       colors[i4 + 1] = particleColor.g;
       colors[i4 + 2] = particleColor.b;
 
-      // Calculate alpha for fade-out effect
       let particleAlpha = 1.0;
       if (normalizedDist > outerFadeStartNormalized) {
         particleAlpha = 1.0 - (normalizedDist - outerFadeStartNormalized) / (1.0 - outerFadeStartNormalized);
       }
-      particleAlpha = Math.max(0.0, Math.min(1.0, particleAlpha)); // Clamp alpha
+      particleAlpha = Math.max(0.0, Math.min(1.0, particleAlpha)); 
       colors[i4 + 3] = particleAlpha;
     }
 
     particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 4)); // Set to 4 components
+    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
 
     const particlesMaterial = new THREE.PointsMaterial({
       size: 0.01, 
       vertexColors: true,
       transparent: true,
-      opacity: opacity, // Global opacity controlled by slider
+      opacity: opacity, 
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -193,11 +249,19 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       }
     });
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); 
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); 
     scene.add(ambientLight);
 
     const blackHoleGeometry = new THREE.SphereGeometry(blackHoleRadius, 64, 64);
-    const blackHoleMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const blackHoleMaterial = new THREE.ShaderMaterial({
+      vertexShader: blackHoleVertexShader,
+      fragmentShader: blackHoleFragmentShader,
+      uniforms: {
+        u_time: { value: 0.0 },
+        // u_cameraPosition: { value: camera.position } // Pass camera position if needed explicitly
+      },
+      transparent: false, // Black hole is opaque
+    });
     const blackHole = new THREE.Mesh(blackHoleGeometry, blackHoleMaterial);
     scene.add(blackHole);
     blackHoleRef.current = blackHole;
@@ -206,8 +270,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     
     const starsGeometry = new THREE.BufferGeometry();
     const starVertices = [];
-    for (let i = 0; i < 50000; i++) { 
-        const r = 100 + Math.random() * 350; 
+    for (let i = 0; i < 60000; i++) { 
+        const r = 100 + Math.random() * 400; 
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
         const x = r * Math.sin(theta) * Math.cos(phi);
@@ -216,7 +280,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         starVertices.push(x, y, z);
     }
     starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.5, sizeAttenuation: true }); 
+    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.6, sizeAttenuation: true }); 
     const stars = new THREE.Points(starsGeometry, starsMaterial);
     scene.add(stars);
     starsRef.current = stars;
@@ -226,6 +290,15 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       animationFrameId = requestAnimationFrame(animate);
       controls.update();
       const deltaTime = clockRef.current.getDelta();
+      const elapsedTime = clockRef.current.getElapsedTime();
+
+      if (blackHoleRef.current && blackHoleRef.current.material instanceof THREE.ShaderMaterial) {
+        blackHoleRef.current.material.uniforms.u_time.value = elapsedTime;
+        // If u_cameraPosition uniform is used:
+        // if (cameraRef.current) {
+        //   blackHoleRef.current.material.uniforms.u_cameraPosition.value.copy(cameraRef.current.position);
+        // }
+      }
 
       if (accretionDiskRef.current && accretionDiskRef.current.geometry) {
         const positions = accretionDiskRef.current.geometry.attributes.position.array as Float32Array;
@@ -312,9 +385,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   useEffect(() => {
     if (accretionDiskRef.current && accretionDiskRef.current.material instanceof THREE.PointsMaterial) {
       accretionDiskRef.current.material.opacity = accretionDiskOpacity;
-      // If we re-create particles on opacity change, this direct update is fine.
-      // If not, and we want opacity to affect the fade calculation, we'd need to regenerate particles or use shaders.
-      // For now, this global opacity multiplier is standard.
     }
   }, [accretionDiskOpacity]);
 
@@ -323,4 +393,3 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
-
