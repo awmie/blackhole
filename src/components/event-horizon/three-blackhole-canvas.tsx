@@ -56,9 +56,9 @@ const baseAngularSpeed = 1.0;
 const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
 
-const PULL_IN_FACTOR_DISSOLVING = 5.0; // Increased from 0.1
+const PULL_IN_FACTOR_DISSOLVING = 5.0;
 const CONTINUOUS_ORBITAL_DECAY_RATE = 0.002;
-const PLANET_ORBITAL_DECAY_MULTIPLIER = 2.0; // Planets decay faster
+const PLANET_ORBITAL_DECAY_MULTIPLIER = 2.0; 
 
 const DISSOLUTION_START_RADIUS_FACTOR = 1.01;
 const DISSOLUTION_DURATION = 1.5;
@@ -215,9 +215,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     spawnedPlanetsRef_anim.current = spawnedPlanets;
   }, [spawnedPlanets]);
 
-  const isEmittingJetsRef = useRef(isEmittingJets);
+  const isEmittingJetsRef_anim = useRef(isEmittingJets);
   useEffect(() => {
-    isEmittingJetsRef.current = isEmittingJets;
+    isEmittingJetsRef_anim.current = isEmittingJets;
   }, [isEmittingJets]);
 
   const blackHoleRadiusRef_anim = useRef(blackHoleRadius);
@@ -713,7 +713,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.05);
 
             if (planetProp.type === 'star' && starEmittedParticlesRef.current && starEmittedParticleDataRef.current.length > 0 && object3D) {
-                if (currentPositionVec.length() < blackHoleActualRadius * STAR_LIGHT_EMISSION_PROXIMITY_FACTOR) {
+                 if (currentPositionVec.length() < blackHoleActualRadius * STAR_LIGHT_EMISSION_PROXIMITY_FACTOR) {
                     if (onStarMassLossRef.current) {
                         onStarMassLossRef.current(planetProp.id, STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND * deltaTime);
                     }
@@ -820,11 +820,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     colorsAttribute[i * 3 + 1] = p.color.g * fade;
                     colorsAttribute[i * 3 + 2] = p.color.b * fade;
                     activeJets = true;
-                } else if (isEmittingJetsRef.current && Math.random() < 0.20) { 
+                } else if (isEmittingJetsRef_anim.current && Math.random() < 0.20) { 
                     const direction = Math.random() > 0.5 ? 1 : -1;
                     p.position.set(0, direction * blackHoleRadiusRef_anim.current * 1.05, 0);
 
-                    const spreadAngle = Math.PI / 4; 
+                    const spreadAngle = Math.PI / 12; // Reduced spreadAngle for thinner jets
                     const coneAngle = Math.random() * Math.PI * 2; 
                     const elevationAngle = (Math.random() * spreadAngle) - (spreadAngle / 2); 
 
@@ -834,7 +834,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         Math.sin(elevationAngle) * Math.sin(coneAngle)
                     );
                     
-                    const randomOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(0.5);
+                    const randomOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(0.15); // Reduced randomOffset scalar
                     velDir.add(randomOffset);
 
                     p.velocity.copy(velDir.normalize().multiplyScalar(JET_SPEED * (0.7 + Math.random() * 0.6))); 
@@ -848,8 +848,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     colorsAttribute[i * 3] = 0; colorsAttribute[i * 3 + 1] = 0; colorsAttribute[i * 3 + 2] = 0;
                 }
             });
-            jetParticlesRef.current.visible = activeJets || isEmittingJetsRef.current;
-            if (activeJets || isEmittingJetsRef.current) { 
+            jetParticlesRef.current.visible = activeJets || isEmittingJetsRef_anim.current;
+            if (activeJets || isEmittingJetsRef_anim.current) { 
               jetParticlesRef.current.geometry.attributes.position.needsUpdate = true;
               jetParticlesRef.current.geometry.attributes.color.needsUpdate = true;
             }
@@ -1100,3 +1100,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
     
+
