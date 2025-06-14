@@ -46,7 +46,7 @@ const photonRingThreshold = 0.03;
 const PULL_IN_FACTOR_DISSOLVING = 0.1;
 const CONTINUOUS_ORBITAL_DECAY_RATE = 0.002; 
 
-const DISSOLUTION_START_RADIUS_FACTOR = 1.01; // Adjusted from 1.05
+const DISSOLUTION_START_RADIUS_FACTOR = 1.01; 
 const DISSOLUTION_DURATION = 1.5; 
 
 interface DiskParticleData {
@@ -347,11 +347,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     if (!THREE) return;
 
     const scene = sceneRef.current;
-    if (!scene) return; // Scene might not be initialized yet if this effect runs before main one
+    if (!scene) return; 
 
     initJetParticles(scene);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initJetParticles]); // Depend on initJetParticles
+  }, [initJetParticles]); 
 
 
   useEffect(() => {
@@ -364,7 +364,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
-    clockRef.current = new THREE.Clock();
+    
+    if (!clockRef.current) {
+      clockRef.current = new THREE.Clock();
+    }
 
 
     const camera = new THREE.PerspectiveCamera(
@@ -438,7 +441,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     directionalLight.position.set(5, 10, 7.5);
     scene.add(directionalLight);
 
-    initJetParticles(scene); // Call here as well to ensure it's created with the main scene objects
+    initJetParticles(scene); 
 
     const currentRendererDomElement = renderer.domElement;
     const handleCanvasShiftClick = (event: PointerEvent) => {
@@ -523,7 +526,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             );
             
             currentPlanetOrbitRadius -= PULL_IN_FACTOR_DISSOLVING * blackHoleActualRadius * deltaTime * (0.5 + progress * 1.5);
-            currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.1); 
+            currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.05); 
 
             if (progress >= 1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planetProp.id);
@@ -543,10 +546,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             
             if (distanceToCenterSq < Math.pow(blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR, 2)) {
                 if (onSetPlanetDissolvingRef.current) onSetPlanetDissolvingRef.current(planetProp.id, true);
-            } else if (currentPositionVec.length() < blackHoleActualRadius * 0.9 || currentPlanetTimeToLive <= 0) {
+            } else if (currentPlanetTimeToLive <= 0 || currentPositionVec.length() < blackHoleActualRadius * 0.1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planetProp.id);
             }
-             currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.1); 
+             currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.05); 
         }
         
         evolvingData.radius = currentPlanetOrbitRadius; 
@@ -708,9 +711,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     if (!scene || !THREE) return;
 
     const currentPlanetMeshIds = new Set(planetMeshesRef.current.keys());
-    const incomingPlanetIds = new Set(spawnedPlanets.map(p => p.id));
+    const incomingPlanetIds = new Set(spawnedPlanetsRef.current.map(p => p.id));
 
-    spawnedPlanets.forEach(planetProp => {
+    spawnedPlanetsRef.current.forEach(planetProp => {
       let mesh = planetMeshesRef.current.get(planetProp.id);
       if (!mesh) {
         const geometry = new THREE.SphereGeometry(1, 16, 16);
@@ -769,7 +772,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         dissolvingObjectsProgressRef.current.delete(id);
       }
     });
-  }, [spawnedPlanets, sceneRef]);
+  }, [spawnedPlanets]);
 
 
   return <div ref={mountRef} className="w-full h-full outline-none" data-ai-hint="galaxy space" />;
