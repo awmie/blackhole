@@ -67,8 +67,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     const colorOuter = new THREE.Color(0.2, 0.1, 0.7); 
     const colorPhotonRing = new THREE.Color(1.0, 0.95, 0.85); 
 
-    const baseAngularSpeed = 0.4; // Adjusted base speed
-    const minAngularSpeedFactor = 0.05; // Adjusted min speed factor
+    const baseAngularSpeed = 0.4; 
+    const minAngularSpeedFactor = 0.05; 
 
     for (let i = 0; i < NUM_PARTICLES; i++) {
       const i3 = i * 3;
@@ -79,9 +79,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       let normalizedDist = (radius - innerR) / (outerR - innerR);
       normalizedDist = Math.max(0, Math.min(1, normalizedDist)); // Clamp to [0, 1]
 
-      // Keplerian-like scaling for angular velocity: omega ~ r^(-3/2)
+      // Keplerian-like scaling for angular velocity: omega ~ (innerR/radius)^2
       // Particles closer to innerR will be much faster.
-      const keplerianFactor = Math.pow(innerR / radius, 1.5);
+      const keplerianFactor = Math.pow(innerR / radius, 2.0); // Changed exponent from 1.5 to 2.0
       let angularVelocity = baseAngularSpeed * keplerianFactor;
 
       // Additional massive boost for the photon ring particles
@@ -316,4 +316,3 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 };
 
 export default ThreeBlackholeCanvas;
-
