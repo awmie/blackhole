@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Sun, PanelLeftClose, PanelRightClose, Layers, Ruler, Move3d, Database, Atom, Sparkles } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sun, PanelLeftClose, PanelRightClose, Layers, Ruler, Move3d, Database, Atom } from 'lucide-react';
 
 interface ControlPanelProps {
   blackHoleRadius: number;
@@ -20,7 +21,9 @@ interface ControlPanelProps {
   accretionDiskOpacity: number;
   setAccretionDiskOpacity: (value: number) => void;
   cameraPosition: { x: number; y: number; z: number };
-  onSpawnPlanetClick: () => void;
+  onSpawnObjectClick: () => void; // Renamed from onSpawnPlanetClick
+  selectedObjectType: 'planet' | 'star';
+  setSelectedObjectType: (type: 'planet' | 'star') => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -33,9 +36,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   accretionDiskOpacity,
   setAccretionDiskOpacity,
   cameraPosition,
-  onSpawnPlanetClick,
+  onSpawnObjectClick,
+  selectedObjectType,
+  setSelectedObjectType,
 }) => {
-  const calculatedSchwarzschildRadius = (blackHoleRadius * 0.25).toFixed(2); // Example calculation
+  const calculatedSchwarzschildRadius = (blackHoleRadius * 0.25).toFixed(2);
 
   return (
     <ScrollArea className="h-full">
@@ -117,10 +122,25 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <CardTitle className="text-xl font-headline flex items-center"><Atom className="mr-2 h-6 w-6 text-sidebar-primary" /> Object Controls</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={onSpawnPlanetClick} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Atom className="mr-2 h-4 w-4" /> Spawn Planet
+            <div className="space-y-2">
+              <Label htmlFor="objectTypeSelect" className="text-sm font-medium">Object Type to Spawn</Label>
+              <Select
+                value={selectedObjectType}
+                onValueChange={(value) => setSelectedObjectType(value as 'planet' | 'star')}
+              >
+                <SelectTrigger id="objectTypeSelect" className="w-full">
+                  <SelectValue placeholder="Select object type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="planet">Planet</SelectItem>
+                  <SelectItem value="star">Star</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={onSpawnObjectClick} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Atom className="mr-2 h-4 w-4" /> Spawn {selectedObjectType.charAt(0).toUpperCase() + selectedObjectType.slice(1)}
             </Button>
-            <p className="text-xs text-muted-foreground text-center">Planets will orbit and may get absorbed. After 3 absorptions, Hawking radiation jets might appear briefly.</p>
+            <p className="text-xs text-muted-foreground text-center">Shift-click on canvas to spawn at cursor. After {3} absorptions, Hawking radiation jets might appear briefly.</p>
           </CardContent>
         </Card>
 

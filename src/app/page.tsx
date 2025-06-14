@@ -1,15 +1,33 @@
 
 "use client";
 
-import React, { useState, Suspense, useCallback, useEffect } from 'react';
+import React, { useState, Suspense, useCallback, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import * as THREE from 'three';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Info, Atom, Sparkles } from 'lucide-react';
-import type { PlanetState, JetParticleState } from '@/components/event-horizon/three-blackhole-canvas'; // Assuming types are exported
+import { Info } from 'lucide-react';
+// Assuming types are exported from three-blackhole-canvas or defined here
+// For now, let's define PlanetState here for clarity as it's primarily used by page.tsx
 
-// Dynamically import ThreeBlackholeCanvas to ensure it's client-side only
+export interface PlanetState {
+  id: number;
+  type: 'planet' | 'star';
+  orbitRadius: number;
+  currentAngle: number;
+  angularVelocity: number;
+  yOffset: number;
+  color: string;
+  initialScale: { x: number; y: number; z: number };
+  currentScale: { x: number; y: number; z: number };
+  timeToLive: number;
+  isStretching: boolean;
+  stretchAxis: { x: number; y: number; z: number };
+  progressValue: number;
+}
+
+// Dynamically import ThreeBlackholeCanvas
 const ThreeBlackholeCanvas = React.lazy(() => import('@/components/event-horizon/three-blackhole-canvas'));
 
 // Dynamically import ControlPanel with SSR disabled
@@ -27,7 +45,7 @@ const ControlPanelSkeleton = () => (
   </div>
 );
 
-const HAWKING_RADIATION_THRESHOLD = 3; // Number of absorptions to trigger jets
+const HAWKING_RADIATION_THRESHOLD = 3;
 const HAWKING_RADIATION_DURATION = 5000; // 5 seconds
 
 export default function Home() {
@@ -37,12 +55,15 @@ export default function Home() {
   const [accretionDiskOpacity, setAccretionDiskOpacity] = useState(0.8);
   const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 2, z: 5 });
 
-  const [spawnedPlanets, setSpawnedPlanets] = useState<PlanetState[]>([]);
-  const [nextPlanetId, setNextPlanetId] = useState(0);
-  const [absorbedPlanetCount, setAbsorbedPlanetCount] = useState(0);
+  const [spawnedObjects, setSpawnedObjects] = useState<PlanetState[]>([]);
+  const [nextObjectId, setNextObjectId] = useState(0);
+  const [absorbedObjectCount, setAbsorbedObjectCount] = useState(0);
   const [isEmittingJets, setIsEmittingJets] = useState(false);
-  const [showControlsPanel, setShowControlsPanel] = useState(true);
+  const [showControlsPanel, setShowControlsPanel] = useState(false); // Default to false, toggled by button
 
+  const [selectedObjectType, setSelectedObjectType] = useState<'planet' | 'star'>('planet');
+  const [simulationCamera, setSimulationCamera] = useState<THREE.PerspectiveCamera | null>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCameraUpdate = useCallback((position: { x: number; y: number; z: number }) => {
     setCameraPosition(position);
@@ -74,40 +95,57 @@ export default function Home() {
     }
   };
 
-  const handleSpawnPlanet = useCallback(() => {
-    const id = nextPlanetId;
-    setNextPlanetId(prev => prev + 1);
+  const handleSpawnObject = useCallback((clickPosition?: THREE.Vector3) => {
+    const id = nextObjectId;
+    setNextObjectId(prev => prev + 1);
     
-    const orbitRadius = accretionDiskOuterRadius * (0.8 + Math.random() * 0.4); // Spawn near outer edge, slightly randomized
-    const angle = Math.random() * Math.PI * 2;
-    const yOffset = (Math.random() - 0.5) * 0.1; // Slight vertical variation
+    let orbitRadius, currentAngle, yOffset;
+
+    if (clickPosition) {
+      orbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
+      currentAngle = Math.atan2(clickPosition.z, clickPosition.x);
+      yOffset = clickPosition.y; // Or a small random value: (Math.random() - 0.5) * 0.1
+    } else {
+      orbitRadius = accretionDiskInnerRadius + (accretionDiskOuterRadius - accretionDiskInnerRadius) * (0.2 + Math.random() * 0.8);
+      currentAngle = Math.random() * Math.PI * 2;
+      yOffset = (Math.random() - 0.5) * 0.1;
+    }
     
-    // Simplified angular velocity - make it orbit roughly with outer disk particles
-    const baseSpeed = 1.0; // Matches baseAngularSpeed in canvas
-    const minSpeedFactor = 0.02; // Matches minAngularSpeedFactor
+    const baseSpeed = 1.0;
+    const minSpeedFactor = 0.02;
     let angularVelocity = baseSpeed * Math.pow(accretionDiskInnerRadius / orbitRadius, 2.5);
-    angularVelocity = Math.max(angularVelocity, baseSpeed * minSpeedFactor) * (Math.random() > 0.5 ? 1 : -1); // Random direction
+    angularVelocity = Math.max(angularVelocity, baseSpeed * minSpeedFactor) * (Math.random() > 0.5 ? 1 : -1);
 
-    const newPlanet: PlanetState = {
+    let color, initialScale;
+    if (selectedObjectType === 'star') {
+      color = '#FFFF99'; // Bright yellowish white for stars
+      initialScale = { x: 0.2, y: 0.2, z: 0.2 };
+    } else { // planet
+      color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+      initialScale = { x: 0.1, y: 0.1, z: 0.1 };
+    }
+
+    const newObject: PlanetState = {
       id,
+      type: selectedObjectType,
       orbitRadius,
-      currentAngle: angle,
-      angularVelocity: angularVelocity * 0.5, // Slower than disk particles initially
+      currentAngle,
+      angularVelocity: angularVelocity * 0.5,
       yOffset,
-      color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-      initialScale: { x: 0.1, y: 0.1, z: 0.1 }, // Planet size
-      currentScale: { x: 0.1, y: 0.1, z: 0.1 },
-      timeToLive: 60 + Math.random() * 60, // Seconds before it might decay or get pulled in
+      color,
+      initialScale,
+      currentScale: { ...initialScale },
+      timeToLive: 60 + Math.random() * 60,
       isStretching: false,
-      stretchAxis: { x: 0, y: 0, z: 1 }, // Default stretch along Z
-      progressValue: 0, // for animation, if needed
+      stretchAxis: { x: 0, y: 0, z: 1 },
+      progressValue: 0,
     };
-    setSpawnedPlanets(prev => [...prev, newPlanet]);
-  }, [nextPlanetId, accretionDiskOuterRadius, accretionDiskInnerRadius]);
+    setSpawnedObjects(prev => [...prev, newObject]);
+  }, [nextObjectId, accretionDiskOuterRadius, accretionDiskInnerRadius, selectedObjectType]);
 
-  const handleAbsorbPlanet = useCallback((planetId: number) => {
-    setSpawnedPlanets(prev => prev.filter(p => p.id !== planetId));
-    setAbsorbedPlanetCount(prev => {
+  const handleAbsorbObject = useCallback((objectId: number) => {
+    setSpawnedObjects(prev => prev.filter(p => p.id !== objectId));
+    setAbsorbedObjectCount(prev => {
       const newCount = prev + 1;
       if (newCount % HAWKING_RADIATION_THRESHOLD === 0 && newCount > 0) {
         setIsEmittingJets(true);
@@ -117,8 +155,38 @@ export default function Home() {
     });
   }, []);
 
+  const handleShiftClickSpawn = useCallback((event: PointerEvent) => {
+    if (!event.shiftKey || !simulationCamera || !canvasContainerRef.current) return;
+
+    const rect = canvasContainerRef.current.getBoundingClientRect();
+    const mouse = new THREE.Vector2();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, simulationCamera);
+
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Spawning on Y=0 plane
+    const intersectionPoint = new THREE.Vector3();
+    
+    if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
+      handleSpawnObject(intersectionPoint);
+    }
+  }, [simulationCamera, handleSpawnObject]);
+
+  useEffect(() => {
+    const container = canvasContainerRef.current;
+    if (container) {
+      container.addEventListener('pointerdown', handleShiftClickSpawn as EventListener);
+      return () => {
+        container.removeEventListener('pointerdown', handleShiftClickSpawn as EventListener);
+      };
+    }
+  }, [handleShiftClickSpawn]);
+
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background relative">
+    <div className="flex h-screen w-screen overflow-hidden bg-background relative" ref={canvasContainerRef}>
       <div className="absolute top-4 right-4 z-20">
         <Sheet open={showControlsPanel} onOpenChange={setShowControlsPanel}>
           <SheetTrigger asChild>
@@ -141,7 +209,9 @@ export default function Home() {
               accretionDiskOpacity={accretionDiskOpacity}
               setAccretionDiskOpacity={setAccretionDiskOpacity}
               cameraPosition={cameraPosition}
-              onSpawnPlanetClick={handleSpawnPlanet}
+              onSpawnObjectClick={() => handleSpawnObject()} // Button click spawns without specific position
+              selectedObjectType={selectedObjectType}
+              setSelectedObjectType={setSelectedObjectType}
             />
           </SheetContent>
         </Sheet>
@@ -155,9 +225,10 @@ export default function Home() {
             accretionDiskOuterRadius={accretionDiskOuterRadius}
             accretionDiskOpacity={accretionDiskOpacity}
             onCameraUpdate={handleCameraUpdate}
-            spawnedPlanets={spawnedPlanets}
-            onAbsorbPlanet={handleAbsorbPlanet}
+            spawnedPlanets={spawnedObjects} // Renamed prop for clarity
+            onAbsorbPlanet={handleAbsorbObject} // Prop name kept for now
             isEmittingJets={isEmittingJets}
+            onCameraReady={setSimulationCamera}
           />
         </Suspense>
       </div>
