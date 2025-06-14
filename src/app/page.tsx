@@ -24,6 +24,7 @@ export interface PlanetState {
   isStretching: boolean;
   stretchAxis: { x: number; y: number; z: number };
   progressValue: number;
+  isDissolving: boolean; // New property
 }
 
 const ThreeBlackholeCanvas = React.lazy(() => import('@/components/event-horizon/three-blackhole-canvas'));
@@ -46,7 +47,7 @@ const HAWKING_RADIATION_THRESHOLD = 3;
 const HAWKING_RADIATION_DURATION = 5000;
 const SPAWNED_OBJECT_BASE_SPEED = 2.0;
 const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02;
-const SPAWNED_OBJECT_SPEED_SCALAR = 1.5; // Increased from 0.75
+const SPAWNED_OBJECT_SPEED_SCALAR = 1.5; 
 const CLOSE_SPAWN_TIME_TO_LIVE = 1.5;
 const CLOSE_SPAWN_RADIUS_FACTOR = 1.3;
 
@@ -151,6 +152,7 @@ export default function Home() {
       isStretching: false,
       stretchAxis: { x: 0, y: 0, z: 1 },
       progressValue: 0,
+      isDissolving: false, 
     };
     setSpawnedObjects(prev => [...prev, newObject]);
   }, [nextObjectId, blackHoleRadius, accretionDiskOuterRadius, accretionDiskInnerRadius, selectedObjectType]);
@@ -165,6 +167,14 @@ export default function Home() {
       }
       return newCount;
     });
+  }, []);
+
+  const handleSetPlanetDissolving = useCallback((objectId: number, dissolving: boolean) => {
+    setSpawnedObjects(prevObjects => 
+      prevObjects.map(obj => 
+        obj.id === objectId ? { ...obj, isDissolving: dissolving, timeToLive: dissolving ? 1.5 : obj.timeToLive } : obj
+      )
+    );
   }, []);
 
 
@@ -210,6 +220,7 @@ export default function Home() {
             onCameraUpdate={handleCameraUpdate}
             spawnedPlanets={spawnedObjects}
             onAbsorbPlanet={handleAbsorbObject}
+            onSetPlanetDissolving={handleSetPlanetDissolving}
             isEmittingJets={isEmittingJets}
             onCameraReady={setSimulationCamera}
             onShiftClickSpawnAtPoint={handleSpawnObject}
