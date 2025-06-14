@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sun, PanelLeftClose, PanelRightClose, Layers, Ruler, Move3d, Database, Atom, Zap } from 'lucide-react';
+import { Sun, PanelLeftClose, PanelRightClose, Layers, Ruler, Move3d, Database, Atom, Zap, Gauge } from 'lucide-react';
 
 interface ControlPanelProps {
   blackHoleRadius: number;
@@ -24,7 +24,9 @@ interface ControlPanelProps {
   onSpawnObjectClick: () => void;
   selectedObjectType: 'planet' | 'star';
   setSelectedObjectType: (type: 'planet' | 'star') => void;
-  onManualJetEmissionClick: () => void;
+  onManualJetEmissionClick: () => void; // Still here for the button inside the panel
+  simulationSpeed: number;
+  setSimulationSpeed: (value: number) => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -41,6 +43,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   selectedObjectType,
   setSelectedObjectType,
   onManualJetEmissionClick,
+  simulationSpeed,
+  setSimulationSpeed,
 }) => {
   const calculatedSchwarzschildRadius = (blackHoleRadius * 0.25).toFixed(2);
 
@@ -80,7 +84,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </Label>
               <Slider
                 id="accretionDiskInnerRadius"
-                min={blackHoleRadius + 0.1} 
+                min={blackHoleRadius + 0.1}
                 max={10}
                 step={0.1}
                 value={[accretionDiskInnerRadius]}
@@ -94,7 +98,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </Label>
               <Slider
                 id="accretionDiskOuterRadius"
-                min={accretionDiskInnerRadius + 0.2} 
+                min={accretionDiskInnerRadius + 0.2}
                 max={20}
                 step={0.1}
                 value={[accretionDiskOuterRadius]}
@@ -118,10 +122,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl font-headline flex items-center"><Atom className="mr-2 h-6 w-6 text-sidebar-primary" /> Object & Effects Controls</CardTitle>
+            <CardTitle className="text-xl font-headline flex items-center"><Atom className="mr-2 h-6 w-6 text-sidebar-primary" /> Object & Effects</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -143,9 +147,31 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               <Atom className="mr-2 h-4 w-4" /> Spawn {selectedObjectType.charAt(0).toUpperCase() + selectedObjectType.slice(1)}
             </Button>
              <Button onClick={onManualJetEmissionClick} variant="outline" className="w-full">
-              <Zap className="mr-2 h-4 w-4" /> Trigger Hawking Radiation
+              <Zap className="mr-2 h-4 w-4" /> Trigger Hawking Jet (Panel)
             </Button>
             <p className="text-xs text-muted-foreground text-center">Shift-click on canvas to spawn at cursor. After {3} absorptions, Hawking radiation jets might appear briefly.</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl font-headline flex items-center"><Gauge className="mr-2 h-6 w-6 text-sidebar-primary" /> Simulation Speed</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <Label htmlFor="simulationSpeed" className="flex items-center text-sm font-medium mb-2">
+                <Gauge className="mr-2 h-4 w-4" /> Speed Factor: {simulationSpeed.toFixed(2)}x
+              </Label>
+              <Slider
+                id="simulationSpeed"
+                min={0.1}
+                max={5}
+                step={0.1}
+                value={[simulationSpeed]}
+                onValueChange={(value) => setSimulationSpeed(value[0])}
+                aria-label="Simulation Speed Factor"
+              />
+            </div>
           </CardContent>
         </Card>
 
