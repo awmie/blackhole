@@ -13,20 +13,20 @@ import { Info, Zap } from 'lucide-react';
 export interface PlanetState {
   id: number;
   type: 'planet' | 'star';
-  orbitRadius: number;
-  currentAngle: number;
-  angularVelocity: number;
+  orbitRadius: number; // Used for initial placement
+  currentAngle: number; // Used for initial placement
+  velocity: { x: number; y: number; z: number }; // Initial velocity
   yOffset: number;
   color: string;
   initialScale: { x: number; y: number; z: number };
   timeToLive: number;
   isDissolving: boolean;
-  currentMassFactor?: number;
-  position?: { x: number; y: number; z: number }; // Added for collision detection
+  currentMassFactor?: number; // For stars
+  position?: { x: number; y: number; z: number }; // Current position, updated by canvas
 }
 
 export interface CollisionEvent {
-  id: string; // Unique ID for the event
+  id: string; 
   point: { x: number; y: number; z: number };
   color1: string;
   color2: string;
@@ -54,16 +54,16 @@ const ControlPanelSkeleton = () => (
 
 const HAWKING_RADIATION_THRESHOLD = 3;
 const HAWKING_RADIATION_DURATION = 5000; // ms
-const SPAWNED_OBJECT_BASE_SPEED = 2.0;
-const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02;
-const SPAWNED_OBJECT_SPEED_SCALAR = 1.0;
+const SPAWNED_OBJECT_BASE_SPEED_MAGNITUDE = 1.0; // Adjusted for initial velocity magnitude
+const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02; // Applied to speed magnitude
+const SPAWNED_OBJECT_SPEED_SCALAR = 1.0; // Scales final initial speed
 const CLOSE_SPAWN_TIME_TO_LIVE = 2.0;
 const CLOSE_SPAWN_RADIUS_FACTOR = 1.3;
 const DISSOLUTION_EFFECT_DURATION = 1.5;
-const COLLISION_DISSOLUTION_DURATION = 1.0; // Objects shatter and get absorbed quickly
+const COLLISION_DISSOLUTION_DURATION = 1.0; 
 const STAR_MIN_MASS_FACTOR_BEFORE_DISSOLUTION = 0.1;
-const COLLISION_CHECK_RADIUS_MULTIPLIER_PLANET = 0.8; // Adjust for tighter collision box
-const COLLISION_CHECK_RADIUS_MULTIPLIER_STAR = 0.8;   // Adjust for tighter collision box
+const COLLISION_CHECK_RADIUS_MULTIPLIER_PLANET = 0.8; 
+const COLLISION_CHECK_RADIUS_MULTIPLIER_STAR = 0.8;   
 
 
 export default function Home() {
@@ -72,7 +72,7 @@ export default function Home() {
   const [accretionDiskOuterRadius, setAccretionDiskOuterRadius] = useState(3);
   const [accretionDiskOpacity, setAccretionDiskOpacity] = useState(0.8);
   const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 2, z: 5 });
-  const [simulationSpeed, setSimulationSpeed] = useState(1.5); 
+  const [simulationSpeed, setSimulationSpeed] = useState(1.0); // Start with a more moderate speed for N-body
 
   const [spawnedObjects, setSpawnedObjects] = useState<PlanetState[]>([]);
   const [nextObjectId, setNextObjectId] = useState(0);
@@ -93,8 +93,6 @@ export default function Home() {
 
   const handleBlackHoleRadiusChange = (value: number) => {
     setBlackHoleRadius(value);
-    // Accretion disk radii state (controlled by sliders) are independent.
-    // The actual radii passed to the canvas for particle generation will be clamped.
   };
 
   const handleAccretionDiskInnerRadiusChange = (value: number) => {
@@ -121,66 +119,84 @@ export default function Home() {
     const id = nextObjectId;
     setNextObjectId(prev => prev + 1);
 
-    let objectOrbitRadius, currentAngle, yOffset;
+    let objectInitialOrbitRadius, initialAngle, yOffset;
+    let initialPosX, initialPosY, initialPosZ;
 
-    // For spawning, use an effective inner radius that considers the black hole's actual size
-    // to prevent spawning objects directly inside it by default.
     const diskEffectiveInnerRadiusForSpawning = Math.max(accretionDiskInnerRadius, blackHoleRadius);
     const diskEffectiveOuterRadiusForSpawning = Math.max(accretionDiskOuterRadius, diskEffectiveInnerRadiusForSpawning + 0.2);
 
-
     if (clickPosition) {
-      objectOrbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
-      currentAngle = Math.atan2(clickPosition.z, clickPosition.x);
+      initialPosX = clickPosition.x;
+      initialPosY = clickPosition.y;
+      initialPosZ = clickPosition.z;
+      objectInitialOrbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
+      initialAngle = Math.atan2(clickPosition.z, clickPosition.x);
       yOffset = clickPosition.y;
-      objectOrbitRadius = Math.max(objectOrbitRadius, blackHoleRadius * 0.98); 
+      // Ensure object is not spawned directly inside black hole if clicked too close
+      if (objectInitialOrbitRadius < blackHoleRadius * 0.98) {
+          const normX = clickPosition.x / objectInitialOrbitRadius;
+          const normZ = clickPosition.z / objectInitialOrbitRadius;
+          objectInitialOrbitRadius = blackHoleRadius * 0.98;
+          initialPosX = normX * objectInitialOrbitRadius;
+          initialPosZ = normZ * objectInitialOrbitRadius;
+      }
+
     } else {
-      // Ensure spawning happens in a sensible range based on the *visible* disk
-      objectOrbitRadius = diskEffectiveInnerRadiusForSpawning + (diskEffectiveOuterRadiusForSpawning - diskEffectiveInnerRadiusForSpawning) * (0.2 + Math.random() * 0.8);
-      currentAngle = Math.random() * Math.PI * 2;
+      objectInitialOrbitRadius = diskEffectiveInnerRadiusForSpawning + (diskEffectiveOuterRadiusForSpawning - diskEffectiveInnerRadiusForSpawning) * (0.2 + Math.random() * 0.8);
+      initialAngle = Math.random() * Math.PI * 2;
       yOffset = (Math.random() - 0.5) * 0.1;
+      initialPosX = objectInitialOrbitRadius * Math.cos(initialAngle);
+      initialPosY = yOffset;
+      initialPosZ = objectInitialOrbitRadius * Math.sin(initialAngle);
     }
     
-    objectOrbitRadius = Math.max(objectOrbitRadius, 0.01); 
+    objectInitialOrbitRadius = Math.max(objectInitialOrbitRadius, 0.01); 
 
-    let angularVelocity = SPAWNED_OBJECT_BASE_SPEED * Math.pow(Math.max(0.1, diskEffectiveInnerRadiusForSpawning) / objectOrbitRadius, 2.5);
-    angularVelocity = Math.max(angularVelocity, SPAWNED_OBJECT_BASE_SPEED * SPAWNED_OBJECT_MIN_SPEED_FACTOR);
-    angularVelocity *= SPAWNED_OBJECT_SPEED_SCALAR * simulationSpeed; 
-    angularVelocity = Math.abs(angularVelocity);
-
+    // Calculate initial tangential speed for orbit primarily around black hole
+    // (Canvas will refine this with N-body physics)
+    let initialSpeedMagnitude = SPAWNED_OBJECT_BASE_SPEED_MAGNITUDE * Math.pow(Math.max(0.1, blackHoleRadius) / objectInitialOrbitRadius, 0.5); // Simplified v = sqrt(GM/r)
+    initialSpeedMagnitude = Math.max(initialSpeedMagnitude, SPAWNED_OBJECT_BASE_SPEED_MAGNITUDE * SPAWNED_OBJECT_MIN_SPEED_FACTOR);
+    initialSpeedMagnitude *= SPAWNED_OBJECT_SPEED_SCALAR; 
+    // Removed simulationSpeed multiplication here, it will be handled in canvas physics deltaTime
+    
+    const initialVelocity = {
+        x: -initialSpeedMagnitude * Math.sin(initialAngle),
+        y: 0, // Assuming initial orbit primarily in XZ plane relative to spawn logic
+        z: initialSpeedMagnitude * Math.cos(initialAngle)
+    };
 
     let color, initialScale, currentMassFactor;
     if (selectedObjectType === 'star') {
       color = '#FFFF99';
-      initialScale = { x: 0.2, y: 0.2, z: 0.2 };
+      initialScale = { x: 0.2, y: 0.2, z: 0.2 }; // Base scale for stars
       currentMassFactor = 1.0;
     } else {
       color = `hsl(${Math.random() * 360}, 70%, 60%)`;
-      initialScale = { x: 0.1, y: 0.1, z: 0.1 };
+      initialScale = { x: 0.1, y: 0.1, z: 0.1 }; // Base scale for planets
       currentMassFactor = undefined;
     }
 
     let timeToLive = 60 + Math.random() * 60;
-    if (objectOrbitRadius < blackHoleRadius * CLOSE_SPAWN_RADIUS_FACTOR) {
+    if (objectInitialOrbitRadius < blackHoleRadius * CLOSE_SPAWN_RADIUS_FACTOR) {
       timeToLive = CLOSE_SPAWN_TIME_TO_LIVE;
     }
 
     const newObject: PlanetState = {
       id,
       type: selectedObjectType,
-      orbitRadius: objectOrbitRadius,
-      currentAngle,
-      angularVelocity: angularVelocity,
-      yOffset,
+      orbitRadius: objectInitialOrbitRadius, // For reference, actual orbit will be dynamic
+      currentAngle: initialAngle, // For reference
+      velocity: initialVelocity,
+      yOffset, // Initial Y position, velocity may change this
       color,
       initialScale,
       timeToLive: timeToLive,
       isDissolving: false,
       currentMassFactor,
       position: { 
-        x: objectOrbitRadius * Math.cos(currentAngle),
-        y: yOffset,
-        z: objectOrbitRadius * Math.sin(currentAngle),
+        x: initialPosX,
+        y: initialPosY,
+        z: initialPosZ,
       }
     };
     setSpawnedObjects(prev => [...prev, newObject]);
@@ -225,7 +241,7 @@ export default function Home() {
               ...obj,
               currentMassFactor: newMassFactor,
               isDissolving: true,
-              timeToLive: Math.min(obj.timeToLive, DISSOLUTION_EFFECT_DURATION * 1.2)
+              timeToLive: Math.min(obj.timeToLive, DISSOLUTION_EFFECT_DURATION * 1.2) // Stars also dissolve quickly when depleted
             };
           }
           return { ...obj, currentMassFactor: newMassFactor };
@@ -235,8 +251,8 @@ export default function Home() {
     );
   }, []);
 
-  const handleUpdatePlanetPosition = useCallback((objectId: number, position: {x:number, y:number, z:number}) => {
-    setSpawnedObjects(prev => prev.map(obj => obj.id === objectId ? {...obj, position} : obj));
+  const handleUpdatePlanetPosition = useCallback((objectId: number, newPosition: {x:number, y:number, z:number}, newVelocity: {x:number, y:number, z:number}) => {
+    setSpawnedObjects(prev => prev.map(obj => obj.id === objectId ? {...obj, position: newPosition, velocity: newVelocity} : obj));
   }, []);
 
   useEffect(() => {
@@ -319,13 +335,12 @@ export default function Home() {
     const timeoutId = setTimeout(() => recentlyCollidedPairs.current.clear(), 500); 
     return () => clearTimeout(timeoutId);
 
-  }, [spawnedObjects, simulationSpeed]); 
+  }, [spawnedObjects]); 
 
   const handleCollisionEventProcessed = useCallback((eventId: string) => {
     setCollisionEvents(prev => prev.filter(event => event.id !== eventId));
   }, []);
 
-  // Calculate effective radii for the ThreeBlackholeCanvas
   const effectiveCanvasInnerRadius = Math.max(accretionDiskInnerRadius, blackHoleRadius);
   const effectiveCanvasOuterRadius = Math.max(accretionDiskOuterRadius, effectiveCanvasInnerRadius + 0.1);
 
@@ -362,9 +377,9 @@ export default function Home() {
             <ControlPanel
               blackHoleRadius={blackHoleRadius}
               setBlackHoleRadius={handleBlackHoleRadiusChange}
-              accretionDiskInnerRadius={accretionDiskInnerRadius} // Pass raw slider value
+              accretionDiskInnerRadius={accretionDiskInnerRadius} 
               setAccretionDiskInnerRadius={handleAccretionDiskInnerRadiusChange}
-              accretionDiskOuterRadius={accretionDiskOuterRadius} // Pass raw slider value
+              accretionDiskOuterRadius={accretionDiskOuterRadius} 
               setAccretionDiskOuterRadius={handleAccretionDiskOuterRadiusChange}
               accretionDiskOpacity={accretionDiskOpacity}
               setAccretionDiskOpacity={setAccretionDiskOpacity}
@@ -398,6 +413,7 @@ export default function Home() {
             onUpdatePlanetPosition={handleUpdatePlanetPosition}
             collisionEvents={collisionEvents}
             onCollisionEventProcessed={handleCollisionEventProcessed}
+            simulationSpeed={simulationSpeed}
           />
         </Suspense>
       </div>
