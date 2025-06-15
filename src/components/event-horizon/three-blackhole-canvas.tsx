@@ -134,12 +134,14 @@ void main() {
   vec3 normal = normalize(v_normal);
   vec3 viewDir = normalize(u_cameraPosition - v_worldPosition);
 
-  // Sharpened Fresnel effect for a thinner, brighter edge
-  float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 8.0) * 2.5;
-  fresnel = clamp(fresnel, 0.0, 1.0);
+  // Fresnel effect for the rim - sharpened
+  float rawFresnel = pow(1.0 - abs(dot(normal, viewDir)), 10.0);
+  float rimProfile = smoothstep(0.15, 0.45, rawFresnel) * 1.8; // Shape into a band, boost
+  rimProfile = clamp(rimProfile, 0.0, 1.0); // Clamp to ensure it's a valid mix factor
 
   float timeFactor = u_time * 0.07;
 
+  // Noise coordinates and calculation for texturing
   vec2 noiseCoordBase1 = v_worldPosition.xz * 0.7 + timeFactor * 0.06;
   noiseCoordBase1.x += sin(v_worldPosition.y * 18.0 + timeFactor * 0.25) * 0.35;
   noiseCoordBase1.y += cos(v_worldPosition.x * 15.0 - timeFactor * 0.21) * 0.3;
@@ -150,10 +152,10 @@ void main() {
   
   float noiseVal1 = fbm(noiseCoordBase1);
   float noiseVal2 = fbm(noiseCoordBase2 * 1.4 + vec2(sin(timeFactor*0.12), cos(timeFactor*0.12)) * 0.6);
-
   float rawNoise = (noiseVal1 * 0.6 + noiseVal2 * 0.4);
-  float noiseModulation = 0.6 + rawNoise * 0.4; // Modulate noise influence to be between 0.6 and 1.0
-  float effectIntensity = fresnel * noiseModulation * 1.5; // Boosted intensity, less likely to be 0 from noise
+  
+  // Apply noise to modulate the brightness/texture of the lensed light itself
+  float lensedLightTextureModulation = 0.6 + rawNoise * 0.4; // Modulate between 0.6 and 1.0
   
   vec4 bhCenterClip = projectionMatrix * viewMatrix * u_bhModelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
   vec2 bhCenterNDC = bhCenterClip.xy / bhCenterClip.w;
@@ -189,8 +191,11 @@ void main() {
   sampleUV = clamp(sampleUV, 0.0, 1.0);
 
   vec3 lensedSceneColor = texture2D(u_starfieldTexture, sampleUV).rgb;
+  vec3 texturedLensedColor = lensedSceneColor * lensedLightTextureModulation;
   vec3 coreColor = vec3(0.0, 0.0, 0.0);
-  vec3 finalColor = mix(coreColor, lensedSceneColor, clamp(effectIntensity, 0.0, 1.0));
+
+  // Mix based on the rimProfile
+  vec3 finalColor = mix(coreColor, texturedLensedColor, rimProfile);
 
   gl_FragColor = vec4(finalColor, 1.0);
 }
@@ -210,8 +215,6 @@ const STAR_DISSOLUTION_PARTICLE_LIFESPAN = 1.5;
 const STAR_DISSOLUTION_PARTICLE_INITIAL_SPEED = 0.3;
 const STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR = 0.5;
 
-// STAR_LIGHT_PARTICLE related constants are no longer used for continuous trails
-// They are effectively replaced by STAR_DISSOLUTION logic for particle emission during absorption
 
 const SHATTER_PARTICLE_POOL_SIZE = 5000;
 const SHATTER_PARTICLES_PER_COLLISION = 75;
@@ -900,7 +903,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         const pIndex = lastJetParticleIndexRef.current;
                         const jetP = jetParticleDataRef.current[pIndex];
                         if (jetP && !jetP.active) {
-                            jetP.active = true;
                             activeJetsVisualsNeedUpdate = true;
                             
                             jetP.position.set(0, jetDirection * blackHoleRadiusRef_anim.current * 1.05, 0);
