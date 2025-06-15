@@ -111,7 +111,7 @@ uniform sampler2D u_starfieldTexture;
 uniform vec2 u_resolution;          
 uniform float u_lensingStrength;    
 uniform mat4 u_bhModelMatrix;      
-uniform mat4 projectionMatrix; 
+uniform mat4 projectionMatrix; // Explicitly declare, Three.js should provide it if available by this name
 
 
 float simpleNoise(vec2 st) {
@@ -669,7 +669,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         u_resolution: { value: new THREE.Vector2(mountRef.current.clientWidth, mountRef.current.clientHeight) },
         u_lensingStrength: { value: 0.12 }, 
         u_bhModelMatrix: { value: new THREE.Matrix4() },
-        projectionMatrix: { value: camera.projectionMatrix } 
       },
     });
     const blackHoleMesh = new THREE.Mesh(blackHoleGeometry, blackHoleMaterialRef.current);
@@ -747,7 +746,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       bhMaterial_anim.uniforms.u_cameraPosition.value.copy(mainCam_anim.position);
       bhMaterial_anim.uniforms.u_resolution.value.set(renderer_anim.domElement.width, renderer_anim.domElement.height);
       bhMaterial_anim.uniforms.u_bhModelMatrix.value.copy(bh_anim.matrixWorld);
-      bhMaterial_anim.uniforms.projectionMatrix.value = mainCam_anim.projectionMatrix;
 
 
       if (accretionDiskRef.current?.geometry) {
@@ -941,11 +939,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         activeJets = true;
                         const direction = Math.random() > 0.5 ? 1 : -1;
                         jetP.position.set(0, direction * blackHoleRadiusRef_anim.current * 1.05, 0);
-                        const spreadAngle = Math.PI / 12; 
+                        const spreadAngle = Math.PI / 24; // Made thinner
                         const coneAngle = Math.random() * Math.PI * 2; 
                         const elevationAngle = (Math.random() * spreadAngle) - (spreadAngle / 2); 
                         let velDir = new THREE_ANIM.Vector3(Math.sin(elevationAngle) * Math.cos(coneAngle), Math.cos(elevationAngle) * direction, Math.sin(elevationAngle) * Math.sin(coneAngle));
-                        const randomOffset = new THREE_ANIM.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(0.15);
+                        const randomOffset = new THREE_ANIM.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(0.05); // Reduced offset
                         velDir.add(randomOffset);
                         jetP.velocity.copy(velDir.normalize().multiplyScalar(JET_SPEED * (0.7 + Math.random() * 0.6))); 
                         jetP.life = 1.0; 
