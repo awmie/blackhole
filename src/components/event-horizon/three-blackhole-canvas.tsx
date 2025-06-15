@@ -93,7 +93,7 @@ varying vec4 v_screenPosition; // Screen-space position of the fragment
 
 uniform float u_time;
 uniform vec3 u_cameraPosition;
-uniform sampler2D u_starfieldTexture; // Texture of the rendered starfield
+uniform sampler2D u_starfieldTexture; // Texture of the rendered scene (stars, disk, etc.)
 uniform vec2 u_resolution;           // Screen resolution for aspect ratio
 uniform float u_lensingStrength;     // Strength of the lensing effect
 uniform mat4 u_bhModelMatrix;       // Black hole's model matrix (world transform)
@@ -176,13 +176,13 @@ void main() {
   vec2 sampleUV = fragScreenUV + offsetVectorScreen;
   sampleUV = clamp(sampleUV, 0.0, 1.0); // Ensure UVs stay within texture bounds
 
-  vec3 lensedStarColor = texture2D(u_starfieldTexture, sampleUV).rgb;
+  vec3 lensedSceneColor = texture2D(u_starfieldTexture, sampleUV).rgb;
 
   vec3 coreColor = vec3(0.0, 0.0, 0.0);
   
   // Mix the core black color with the lensed star color.
   // effectIntensity is high at the edges due to fresnel & noise.
-  vec3 finalColor = mix(coreColor, lensedStarColor, clamp(effectIntensity, 0.0, 1.0));
+  vec3 finalColor = mix(coreColor, lensedSceneColor, clamp(effectIntensity, 0.0, 1.0));
 
   gl_FragColor = vec4(finalColor, 1.0);
 }
@@ -255,7 +255,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
   const starEmittedParticleMaterialRef = useRef<THREE_TYPE.PointsMaterial | null>(null);
   const lastStarEmittedParticleIndexRef = useRef(0);
 
-  const starfieldRenderTargetRef = useRef<THREE_TYPE.WebGLRenderTarget | null>(null); // For rendering starfield to texture
+  const sceneCaptureRenderTargetRef = useRef<THREE_TYPE.WebGLRenderTarget | null>(null); 
   const tempVectorRef = useRef<THREE_TYPE.Vector3 | null>(null);
 
 
@@ -541,7 +541,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     }
 
     foregroundSceneRef.current = new THREE.Scene();
-    backgroundSceneRef.current = new THREE.Scene(); // Scene for starfield texture
+    backgroundSceneRef.current = new THREE.Scene(); 
 
 
     const camera = new THREE.PerspectiveCamera(
@@ -567,15 +567,15 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     mountRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    starfieldRenderTargetRef.current = new THREE.WebGLRenderTarget(
+    sceneCaptureRenderTargetRef.current = new THREE.WebGLRenderTarget(
         mountRef.current.clientWidth * window.devicePixelRatio,
         mountRef.current.clientHeight * window.devicePixelRatio
     );
-    if (starfieldRenderTargetRef.current) {
-        starfieldRenderTargetRef.current.texture.minFilter = THREE.LinearFilter;
-        starfieldRenderTargetRef.current.texture.magFilter = THREE.LinearFilter;
-        starfieldRenderTargetRef.current.texture.wrapS = THREE.ClampToEdgeWrapping;
-        starfieldRenderTargetRef.current.texture.wrapT = THREE.ClampToEdgeWrapping;
+    if (sceneCaptureRenderTargetRef.current) {
+        sceneCaptureRenderTargetRef.current.texture.minFilter = THREE.LinearFilter;
+        sceneCaptureRenderTargetRef.current.texture.magFilter = THREE.LinearFilter;
+        sceneCaptureRenderTargetRef.current.texture.wrapS = THREE.ClampToEdgeWrapping;
+        sceneCaptureRenderTargetRef.current.texture.wrapT = THREE.ClampToEdgeWrapping;
     }
 
 
@@ -600,7 +600,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       uniforms: {
         u_time: { value: 0.0 },
         u_cameraPosition: { value: camera.position },
-        u_starfieldTexture: { value: null }, 
+        u_starfieldTexture: { value: sceneCaptureRenderTargetRef.current?.texture || null }, 
         u_resolution: { value: new THREE.Vector2(mountRef.current.clientWidth, mountRef.current.clientHeight) },
         u_lensingStrength: { value: 0.08 }, 
         u_bhModelMatrix: { value: new THREE.Matrix4() } 
@@ -674,11 +674,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       const fgScene_anim = foregroundSceneRef.current;
       const bgScene_anim = backgroundSceneRef.current; 
       const mainCam_anim = cameraRef.current;
-      const starRT_anim = starfieldRenderTargetRef.current;
+      const sceneRT_anim = sceneCaptureRenderTargetRef.current;
       const bhMaterial_anim = blackHoleMaterialRef.current;
       const bh_anim = blackHoleRef.current;
 
-      if (!clockRef.current || !THREE_ANIM || !renderer_anim || !fgScene_anim || !bgScene_anim || !mainCam_anim || !starRT_anim || !bhMaterial_anim || !bh_anim ) return;
+      if (!clockRef.current || !THREE_ANIM || !renderer_anim || !fgScene_anim || !bgScene_anim || !mainCam_anim || !sceneRT_anim || !bhMaterial_anim || !bh_anim ) return;
 
       const deltaTime = clockRef.current.getDelta();
       const elapsedTime = clockRef.current.getElapsedTime();
@@ -938,34 +938,35 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             }
         }
 
-      // Pass 1: Render background (starfield) to the starfieldRenderTarget for lensing
-      if (starsRef.current) starsRef.current.visible = true;
-      renderer_anim.setRenderTarget(starRT_anim);
+      // Pass 1: Capture the scene (stars, disk, planets etc. WITHOUT the black hole) to sceneRT_anim
+      if (bh_anim) bh_anim.visible = false; // Hide black hole for this pass
+      renderer_anim.setRenderTarget(sceneRT_anim);
       renderer_anim.clear();
-      renderer_anim.render(bgScene_anim, mainCam_anim);
+      if (bgScene_anim) renderer_anim.render(bgScene_anim, mainCam_anim); // Render stars to texture
+      if (fgScene_anim) renderer_anim.render(fgScene_anim, mainCam_anim); // Render disk, planets, etc. to texture (BH is hidden)
+      if (bh_anim) bh_anim.visible = true; // Make black hole visible again for the main render
 
-      // Pass 2: Render background (starfield) directly to the screen
-      renderer_anim.setRenderTarget(null);
-      renderer_anim.clear(); // Clear the main screen (color and depth)
-      if (starsRef.current) starsRef.current.visible = true;
-      renderer_anim.render(bgScene_anim, mainCam_anim); // Render stars to main screen
+      // Pass 2: Render background stars to the main screen
+      renderer_anim.setRenderTarget(null); // Render to canvas
+      renderer_anim.clear(); // Clear main canvas (color and depth)
+      if (bgScene_anim) renderer_anim.render(bgScene_anim, mainCam_anim); // Render stars to main screen
 
       // Pass 3: Render foreground scene (including black hole with lensing) to screen, over the stars
-      bhMaterial_anim.uniforms.u_starfieldTexture.value = starRT_anim.texture;
+      // The black hole material's u_starfieldTexture is already pointing to sceneRT_anim.texture
       renderer_anim.clearDepth(); // Clear only the depth buffer, so foreground renders on top of background stars
-      renderer_anim.render(fgScene_anim, mainCam_anim);
+      if (fgScene_anim) renderer_anim.render(fgScene_anim, mainCam_anim); // Render disk, planets, AND black hole (which lenses sceneRT_anim)
 
     };
     animate();
 
     const handleResize = () => {
-      if (mountRef.current && cameraRef.current && rendererRef.current && starfieldRenderTargetRef.current && blackHoleMaterialRef.current) {
+      if (mountRef.current && cameraRef.current && rendererRef.current && sceneCaptureRenderTargetRef.current && blackHoleMaterialRef.current) {
         const width = mountRef.current.clientWidth;
         const height = mountRef.current.clientHeight;
         cameraRef.current.aspect = width / height;
         cameraRef.current.updateProjectionMatrix();
         rendererRef.current.setSize(width, height);
-        starfieldRenderTargetRef.current.setSize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+        sceneCaptureRenderTargetRef.current.setSize(width * window.devicePixelRatio, height * window.devicePixelRatio);
         blackHoleMaterialRef.current.uniforms.u_resolution.value.set(width, height);
       }
     };
@@ -1019,7 +1020,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         }
       }
 
-      starfieldRenderTargetRef.current?.dispose();
+      sceneCaptureRenderTargetRef.current?.dispose();
       
 
 
