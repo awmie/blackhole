@@ -137,7 +137,6 @@ void main() {
   float noiseVal1 = fbm(noiseCoordBase1);
   float noiseVal2 = fbm(noiseCoordBase2 * 1.4 + vec2(sin(timeFactor*0.12), cos(timeFactor*0.12)) * 0.6);
 
-  // float radialDistFactor = smoothstep(0.8, 1.0, length(v_worldPosition.xy / length(vec2(1.0,1.0)))); // This was problematic
   float combinedNoise = (noiseVal1 * 0.6 + noiseVal2 * 0.4); // Noise component
   combinedNoise = smoothstep(0.3, 0.7, combinedNoise); // Thresholding the noise
   
@@ -175,7 +174,7 @@ void main() {
 
   // Sample UV is current fragment's UV plus an offset pointing "outwards" from BH center
   vec2 sampleUV = fragScreenUV + offsetVectorScreen;
-  // sampleUV = clamp(sampleUV, 0.0, 1.0); // Texture wrapping might handle this
+  sampleUV = clamp(sampleUV, 0.0, 1.0); // Ensure UVs stay within texture bounds
 
   vec3 lensedStarColor = texture2D(u_starfieldTexture, sampleUV).rgb;
 
@@ -939,19 +938,21 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             }
         }
 
-      
-      if (starsRef.current) starsRef.current.visible = true; 
+      // Pass 1: Render background (starfield) to the starfieldRenderTarget for lensing
+      if (starsRef.current) starsRef.current.visible = true;
       renderer_anim.setRenderTarget(starRT_anim);
       renderer_anim.clear();
       renderer_anim.render(bgScene_anim, mainCam_anim);
-      renderer_anim.setRenderTarget(null);
-      if (starsRef.current) starsRef.current.visible = true; // Ensure stars are visible for main render if not part of RT
 
-      
+      // Pass 2: Render background (starfield) directly to the screen
+      renderer_anim.setRenderTarget(null);
+      renderer_anim.clear(); // Clear the main screen (color and depth)
+      if (starsRef.current) starsRef.current.visible = true;
+      renderer_anim.render(bgScene_anim, mainCam_anim); // Render stars to main screen
+
+      // Pass 3: Render foreground scene (including black hole with lensing) to screen, over the stars
       bhMaterial_anim.uniforms.u_starfieldTexture.value = starRT_anim.texture;
-      
-      
-      renderer_anim.clear(); 
+      renderer_anim.clearDepth(); // Clear only the depth buffer, so foreground renders on top of background stars
       renderer_anim.render(fgScene_anim, mainCam_anim);
 
     };
@@ -1200,4 +1201,3 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
     
-
