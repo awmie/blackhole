@@ -71,7 +71,7 @@ const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
 
 const PULL_IN_FACTOR_DISSOLVING = 5.0;
-const CONTINUOUS_ORBITAL_DECAY_RATE = 0.002;
+const CONTINUOUS_ORBITAL_DECAY_RATE = 0.008; // Increased for more visible decay
 const PLANET_ORBITAL_DECAY_MULTIPLIER = 2.0; 
 
 const DISSOLUTION_START_RADIUS_FACTOR = 1.01;
@@ -201,9 +201,9 @@ void main() {
 const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
-const JET_PARTICLE_BASE_SIZE = 0.005;
-const JET_SPREAD_ANGLE = Math.PI / 768; // Halved for thinner jet
-const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.00125; // Halved for thinner jet
+const JET_PARTICLE_BASE_SIZE = 0.01; // Matched to accretion disk particle size
+const JET_SPREAD_ANGLE = Math.PI / 1536; // Further reduced for thinner jet
+const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.000625; // Further reduced for thinner jet
 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
@@ -217,7 +217,7 @@ const STAR_LIGHT_EMIT_RATE_PER_FRAME = 1;
 const STAR_LIGHT_PARTICLE_LIFESPAN = 3.0;
 const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05;
 const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02;
-const STAR_LIGHT_PARTICLE_SIZE = 0.005; 
+const STAR_LIGHT_PARTICLE_SIZE = 0.0015; // Reduced star light particle size
 const STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND = 0.005;
 const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8;
 
@@ -228,8 +228,8 @@ const SHATTER_PARTICLE_LIFESPAN_MAX = 1.8;
 const SHATTER_PARTICLE_SPEED_MIN = 0.5;
 const SHATTER_PARTICLE_SPEED_MAX = 2.5;
 const SHATTER_PARTICLE_GRAVITY_FACTOR = 2.0; 
-const SHATTER_PARTICLE_SIZE_MIN = 0.002; 
-const SHATTER_PARTICLE_SIZE_MAX = 0.005; 
+const SHATTER_PARTICLE_SIZE_MIN = 0.0008; // Reduced collision particle min size
+const SHATTER_PARTICLE_SIZE_MAX = 0.002;  // Reduced collision particle max size
 
 
 const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
@@ -820,7 +820,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         particle.life = 1.0; 
                         particle.initialLife = STAR_DISSOLUTION_PARTICLE_LIFESPAN + Math.random() * 0.1;
                         particle.color.copy(starColor);
-                        particle.size = 0.007 + Math.random() * 0.005; 
+                        particle.size = (0.0015 + Math.random() * 0.0015) * currentStarMassFactor; // Reduced size for star dissolution
                     }
                     lastStarEmittedParticleIndexRef.current = (pIndex + 1) % STAR_EMITTED_PARTICLE_COUNT;
                 }
@@ -873,7 +873,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                             particle.life = 1.0; 
                             particle.initialLife = STAR_LIGHT_PARTICLE_LIFESPAN + Math.random() * 0.2;
                             particle.color.copy(starColor).multiplyScalar(0.7 + Math.random() * 0.3);
-                            particle.size = STAR_LIGHT_PARTICLE_SIZE * (0.8 + Math.random() * 0.4);
+                            particle.size = STAR_LIGHT_PARTICLE_SIZE * (0.8 + Math.random() * 0.4); // Uses the reduced constant
                         }
                         lastStarEmittedParticleIndexRef.current = (pIndex + 1) % STAR_EMITTED_PARTICLE_COUNT;
                     }
@@ -934,7 +934,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     positions[i3] = p.position.x; positions[i3 + 1] = p.position.y; positions[i3 + 2] = p.position.z;
                     const fade = Math.max(0, p.life);
                     colorsAttribute[i3] = p.color.r * fade; colorsAttribute[i3 + 1] = p.color.g * fade; colorsAttribute[i3 + 2] = p.color.b * fade;
-                    sizesAttribute[i] = p.size * fade;
+                    sizesAttribute[i] = p.size * fade; // p.size is already JET_PARTICLE_BASE_SIZE * random factor
                     if (p.life <= 0) { p.active = false; positions[i3+1] = -1000; }
                 } else if (isEmittingJetsRef_anim.current && !p.active && Math.random() < 0.25) { 
                     const pIndex = lastJetParticleIndexRef.current; 
@@ -954,7 +954,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         jetP.life = 1.0; 
                         jetP.initialLife = JET_LIFESPAN * (0.6 + Math.random() * 0.8); 
                         jetP.color.setHSL(Math.random() * 0.15 + 0.50, 0.95, 0.75); 
-                        jetP.size = JET_PARTICLE_BASE_SIZE * (0.8 + Math.random() * 0.4);
+                        jetP.size = JET_PARTICLE_BASE_SIZE * (0.8 + Math.random() * 0.4); // Use new base size
                         positions[pIndex*3] = jetP.position.x; positions[pIndex*3+1] = jetP.position.y; positions[pIndex*3+2] = jetP.position.z; 
                         lastJetParticleIndexRef.current = (pIndex + 1) % JET_PARTICLE_COUNT;
                     }
@@ -992,7 +992,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
               particle.initialLife = SHATTER_PARTICLE_LIFESPAN_MIN + Math.random() * (SHATTER_PARTICLE_LIFESPAN_MAX - SHATTER_PARTICLE_LIFESPAN_MIN);
               particle.life = 1.0; // Normalized life
               particle.color.copy(Math.random() > 0.5 ? color1 : color2); // Mix or pick
-              particle.size = SHATTER_PARTICLE_SIZE_MIN + Math.random() * (SHATTER_PARTICLE_SIZE_MAX - SHATTER_PARTICLE_SIZE_MIN);
+              particle.size = SHATTER_PARTICLE_SIZE_MIN + Math.random() * (SHATTER_PARTICLE_SIZE_MAX - SHATTER_PARTICLE_SIZE_MIN); // Use new reduced sizes
             }
             lastShatterParticleIndexRef.current = (pIndex + 1) % SHATTER_PARTICLE_POOL_SIZE;
           }
