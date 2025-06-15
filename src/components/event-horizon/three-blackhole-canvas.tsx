@@ -140,7 +140,7 @@ void main() {
   float combinedNoise = (noiseVal1 * 0.6 + noiseVal2 * 0.4); // Noise component
   combinedNoise = smoothstep(0.3, 0.7, combinedNoise); // Thresholding the noise
   
-  float effectIntensity = fresnel * combinedNoise * 2.5; // This controls mix of lensed light
+  float effectIntensity = fresnel * combinedNoise * 3.5; // This controls mix of lensed light
 
   // Lensing effect calculation
   // Calculate screen UV of the black hole's center (origin in its model space)
@@ -602,7 +602,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         u_cameraPosition: { value: camera.position },
         u_starfieldTexture: { value: null }, 
         u_resolution: { value: new THREE.Vector2(mountRef.current.clientWidth, mountRef.current.clientHeight) },
-        u_lensingStrength: { value: 0.05 }, 
+        u_lensingStrength: { value: 0.08 }, 
         u_bhModelMatrix: { value: new THREE.Matrix4() } 
       },
     });
@@ -1201,3 +1201,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
     
+
