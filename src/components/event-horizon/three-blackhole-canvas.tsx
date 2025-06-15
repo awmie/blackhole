@@ -98,7 +98,6 @@ uniform vec2 u_resolution;           // Screen resolution for aspect ratio
 uniform float u_lensingStrength;     // Strength of the lensing effect
 uniform mat4 u_bhModelMatrix;       // Black hole's model matrix (world transform)
 uniform mat4 projectionMatrix;      // Explicitly declare projectionMatrix
-
 // viewMatrix is assumed to be available as a built-in/implicitly by Three.js
 
 
@@ -138,9 +137,9 @@ void main() {
   float noiseVal1 = fbm(noiseCoordBase1);
   float noiseVal2 = fbm(noiseCoordBase2 * 1.4 + vec2(sin(timeFactor*0.12), cos(timeFactor*0.12)) * 0.6);
 
-  float radialDistFactor = smoothstep(0.8, 1.0, length(v_worldPosition.xy / length(vec2(1.0,1.0))));
-  float combinedNoise = (noiseVal1 * 0.6 + noiseVal2 * 0.4) * (0.3 + radialDistFactor * 0.7);
-  combinedNoise = smoothstep(0.3, 0.7, combinedNoise);
+  // float radialDistFactor = smoothstep(0.8, 1.0, length(v_worldPosition.xy / length(vec2(1.0,1.0)))); // This was problematic
+  float combinedNoise = (noiseVal1 * 0.6 + noiseVal2 * 0.4); // Noise component
+  combinedNoise = smoothstep(0.3, 0.7, combinedNoise); // Thresholding the noise
   
   float effectIntensity = fresnel * combinedNoise * 2.5; // This controls mix of lensed light
 
@@ -946,7 +945,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       renderer_anim.clear();
       renderer_anim.render(bgScene_anim, mainCam_anim);
       renderer_anim.setRenderTarget(null);
-      if (starsRef.current) starsRef.current.visible = true; 
+      if (starsRef.current) starsRef.current.visible = true; // Ensure stars are visible for main render if not part of RT
 
       
       bhMaterial_anim.uniforms.u_starfieldTexture.value = starRT_anim.texture;
@@ -1201,3 +1200,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
     
+
