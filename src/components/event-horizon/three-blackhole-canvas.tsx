@@ -201,8 +201,8 @@ const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
 const JET_PARTICLE_BASE_SIZE = 0.01; 
-const JET_SPREAD_ANGLE = Math.PI / 3072; 
-const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0003125; 
+const JET_SPREAD_ANGLE = Math.PI / 6144; 
+const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.00015625; 
 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
@@ -213,10 +213,10 @@ const STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR = 0.5;
 
 
 const STAR_LIGHT_EMIT_RATE_PER_FRAME = 1; 
-const STAR_LIGHT_PARTICLE_LIFESPAN = 3.0;
+const STAR_LIGHT_PARTICLE_LIFESPAN = 2.0;
 const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05;
 const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02;
-const STAR_LIGHT_PARTICLE_SIZE = 0.0004; 
+const STAR_LIGHT_PARTICLE_SIZE = 0.00015; 
 const STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND = 0.005;
 const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8;
 
@@ -227,7 +227,7 @@ const SHATTER_PARTICLE_LIFESPAN_MAX = 1.8;
 const SHATTER_PARTICLE_SPEED_MIN = 0.5;
 const SHATTER_PARTICLE_SPEED_MAX = 2.5;
 const SHATTER_PARTICLE_GRAVITY_FACTOR = 2.0; 
-const SHATTER_PARTICLE_SIZE_MIN = 0.0008; 
+const SHATTER_PARTICLE_SIZE_MIN = 0.0008;
 const SHATTER_PARTICLE_SIZE_MAX = 0.002;  
 
 
@@ -872,7 +872,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                             particle.life = 1.0; 
                             particle.initialLife = STAR_LIGHT_PARTICLE_LIFESPAN + Math.random() * 0.2;
                             particle.color.copy(starColor).multiplyScalar(0.7 + Math.random() * 0.3);
-                            particle.size = STAR_LIGHT_PARTICLE_SIZE * (0.8 + Math.random() * 0.4); 
+                            particle.size = STAR_LIGHT_PARTICLE_SIZE * (0.7 + Math.random() * 0.3); 
                         }
                         lastStarEmittedParticleIndexRef.current = (pIndex + 1) % STAR_EMITTED_PARTICLE_COUNT;
                     }
@@ -1286,4 +1286,3 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
     
-
