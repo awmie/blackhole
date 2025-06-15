@@ -71,7 +71,7 @@ const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
 
 const PULL_IN_FACTOR_DISSOLVING = 5.0;
-const CONTINUOUS_ORBITAL_DECAY_RATE = 0.008; // Increased for more visible decay
+const CONTINUOUS_ORBITAL_DECAY_RATE = 0.008; 
 const PLANET_ORBITAL_DECAY_MULTIPLIER = 2.0; 
 
 const DISSOLUTION_START_RADIUS_FACTOR = 1.01;
@@ -154,7 +154,6 @@ void main() {
   float combinedNoise = (noiseVal1 * 0.6 + noiseVal2 * 0.4); 
   combinedNoise = smoothstep(0.3, 0.7, combinedNoise); 
   
-  // Adjusted effectIntensity for the thinner band
   float effectIntensity = fresnel * combinedNoise * 2.0;
 
   vec4 bhCenterClip = projectionMatrix * viewMatrix * u_bhModelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
@@ -201,9 +200,9 @@ void main() {
 const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
-const JET_PARTICLE_BASE_SIZE = 0.01; // Matched to accretion disk particle size
-const JET_SPREAD_ANGLE = Math.PI / 1536; // Further reduced for thinner jet
-const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.000625; // Further reduced for thinner jet
+const JET_PARTICLE_BASE_SIZE = 0.01; 
+const JET_SPREAD_ANGLE = Math.PI / 3072; 
+const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0003125; 
 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
@@ -672,7 +671,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         u_cameraPosition: { value: camera.position },
         u_starfieldTexture: { value: sceneCaptureRenderTargetRef.current?.texture || null }, 
         u_resolution: { value: new THREE.Vector2(mountRef.current.clientWidth, mountRef.current.clientHeight) },
-        u_lensingStrength: { value: 0.12 }, 
+        u_lensingStrength: { value: 0.06 }, 
         u_bhModelMatrix: { value: new THREE.Matrix4() },
       },
     });
