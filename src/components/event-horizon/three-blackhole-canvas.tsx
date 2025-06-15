@@ -200,7 +200,7 @@ void main() {
 const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
-const JET_PARTICLE_BASE_SIZE = 0.0015; 
+const JET_PARTICLE_BASE_SIZE = 0.0005; 
 const JET_SPREAD_ANGLE = Math.PI / 16384; 
 const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.00005; 
 
@@ -855,11 +855,9 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.05);
 
             if (planetProp.type === 'star') {
-                 if (currentPositionVec.length() < blackHoleActualRadius * STAR_LIGHT_EMISSION_PROXIMITY_FACTOR) {
-                    if (onStarMassLossRef.current) {
+                 if (currentPositionVec.length() < blackHoleActualRadius * STAR_LIGHT_EMISSION_PROXIMITY_FACTOR && onStarMassLossRef.current) {
                         onStarMassLossRef.current(planetProp.id, STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND * deltaTime);
-                    }
-                }
+                 }
             }
         }
         evolvingData.radius = currentPlanetOrbitRadius;
@@ -936,7 +934,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         jetP.life = 1.0; 
                         jetP.initialLife = JET_LIFESPAN * (0.6 + Math.random() * 0.8); 
                         jetP.color.setHSL(Math.random() * 0.15 + 0.50, 0.95, 0.75); 
-                        jetP.size = JET_PARTICLE_BASE_SIZE; // Base size, will be modulated by random factor and fade in loop
+                        jetP.size = JET_PARTICLE_BASE_SIZE; 
                         positions[pIndex*3] = jetP.position.x; positions[pIndex*3+1] = jetP.position.y; positions[pIndex*3+2] = jetP.position.z; 
                         lastJetParticleIndexRef.current = (pIndex + 1) % JET_PARTICLE_COUNT;
                     }
@@ -1132,7 +1130,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       diskParticleDataRef.current = [];
       THREEInstanceRef.current = null;
     };
-  }, []); // Empty dependency array for init and cleanup
+  }, []); 
 
   useEffect(() => {
     if (blackHoleRef.current) {
@@ -1269,3 +1267,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
     
+
