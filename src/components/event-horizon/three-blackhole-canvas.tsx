@@ -71,10 +71,10 @@ const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
 
 const PULL_IN_FACTOR_DISSOLVING = 5.0;
-const CONTINUOUS_ORBITAL_DECAY_RATE = 0.008; 
+const CONTINUOUS_ORBITAL_DECAY_RATE = 0.05; 
 const PLANET_ORBITAL_DECAY_MULTIPLIER = 2.0; 
 
-const DISSOLUTION_START_RADIUS_FACTOR = 1.01;
+const DISSOLUTION_START_RADIUS_FACTOR = 1.2;
 const DISSOLUTION_DURATION = 1.5;
 
 interface DiskParticleData {
@@ -201,8 +201,8 @@ const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
 const JET_PARTICLE_BASE_SIZE = 0.01; 
-const JET_SPREAD_ANGLE = Math.PI / 6144; 
-const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.00015625; 
+const JET_SPREAD_ANGLE = Math.PI / 12288; 
+const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.000078125; 
 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
@@ -212,13 +212,13 @@ const STAR_DISSOLUTION_PARTICLE_INITIAL_SPEED = 0.3;
 const STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR = 0.5;
 
 
-const STAR_LIGHT_EMIT_RATE_PER_FRAME = 1; 
-const STAR_LIGHT_PARTICLE_LIFESPAN = 2.0;
-const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05;
-const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02;
-const STAR_LIGHT_PARTICLE_SIZE = 0.00015; 
+// These STAR_LIGHT constants are now primarily for the mass loss effect, not particle trails
+const STAR_LIGHT_PARTICLE_LIFESPAN = 2.0; // Was 2.0, effectively unused for visuals now
+const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05; // Effectively unused for visuals
+const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02; // Effectively unused for visuals
+const STAR_LIGHT_PARTICLE_SIZE = 0.00015; // Effectively unused for visuals
 const STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND = 0.005;
-const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8;
+const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8; // Still used for mass loss trigger
 
 const SHATTER_PARTICLE_POOL_SIZE = 5000; 
 const SHATTER_PARTICLES_PER_COLLISION = 150; 
@@ -500,15 +500,15 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             position: new THREE.Vector3(0, -1000, 0), 
             velocity: new THREE.Vector3(),
             life: 0, 
-            initialLife: STAR_LIGHT_PARTICLE_LIFESPAN, 
+            initialLife: STAR_DISSOLUTION_PARTICLE_LIFESPAN, // Default initial life, can be overridden
             color: new THREE.Color(1, 1, 1),
-            size: STAR_LIGHT_PARTICLE_SIZE,
+            size: 0.005, // Default size, can be overridden
             active: false,
         });
         const i3 = i * 3;
         positions[i3] = 0; positions[i3+1] = -1000; positions[i3+2] = 0;
         colorsAttribute[i3] = 1; colorsAttribute[i3+1] = 1; colorsAttribute[i3+2] = 1;
-        sizesAttribute[i] = STAR_LIGHT_PARTICLE_SIZE;
+        sizesAttribute[i] = 0.005;
     }
 
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -855,26 +855,12 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             }
             currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.05);
 
-            if (planetProp.type === 'star' && starEmittedParticlesRef.current && starEmittedParticleDataRef.current.length > 0 && object3D) {
+            // Logic for continuous star "trail" particles REMOVED from here.
+            // Mass loss logic for stars near the black hole (not dissolving yet):
+            if (planetProp.type === 'star') {
                  if (currentPositionVec.length() < blackHoleActualRadius * STAR_LIGHT_EMISSION_PROXIMITY_FACTOR) {
                     if (onStarMassLossRef.current) {
                         onStarMassLossRef.current(planetProp.id, STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND * deltaTime);
-                    }
-                    const starColor = new THREE_ANIM.Color(planetProp.color);
-                    for (let i = 0; i < STAR_LIGHT_EMIT_RATE_PER_FRAME; i++) {
-                        const pIndex = lastStarEmittedParticleIndexRef.current;
-                        const particle = starEmittedParticleDataRef.current[pIndex];
-                        if (particle && !particle.active) {
-                            particle.active = true;
-                            particle.position.copy(object3D.position);
-                            const randomDirection = new THREE_ANIM.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-                            particle.velocity.copy(randomDirection).multiplyScalar(STAR_LIGHT_PARTICLE_INITIAL_SPEED * (0.8 + Math.random() * 0.4));
-                            particle.life = 1.0; 
-                            particle.initialLife = STAR_LIGHT_PARTICLE_LIFESPAN + Math.random() * 0.2;
-                            particle.color.copy(starColor).multiplyScalar(0.7 + Math.random() * 0.3);
-                            particle.size = STAR_LIGHT_PARTICLE_SIZE * (0.7 + Math.random() * 0.3); 
-                        }
-                        lastStarEmittedParticleIndexRef.current = (pIndex + 1) % STAR_EMITTED_PARTICLE_COUNT;
                     }
                 }
             }
@@ -894,7 +880,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 hasActiveStarParticles = true;
                 const forceDirection = new THREE_ANIM.Vector3().subVectors(new THREE_ANIM.Vector3(0,0,0), p.position);
                 const distanceSq = Math.max(0.1, p.position.lengthSq());
-                const gravityFactor = p.initialLife > STAR_DISSOLUTION_PARTICLE_LIFESPAN ? STAR_LIGHT_PARTICLE_GRAVITY_FACTOR : STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR;
+                // Use STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR as STAR_LIGHT_... is unused for active particles now
+                const gravityFactor = STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR; 
                 forceDirection.normalize().multiplyScalar(gravityFactor / distanceSq);
                 p.velocity.addScaledVector(forceDirection, deltaTime);
                 p.position.addScaledVector(p.velocity, deltaTime);
@@ -935,7 +922,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     colorsAttribute[i3] = p.color.r * fade; colorsAttribute[i3 + 1] = p.color.g * fade; colorsAttribute[i3 + 2] = p.color.b * fade;
                     sizesAttribute[i] = p.size * fade; // p.size is already JET_PARTICLE_BASE_SIZE * random factor
                     if (p.life <= 0) { p.active = false; positions[i3+1] = -1000; }
-                } else if (isEmittingJetsRef_anim.current && !p.active && Math.random() < 0.25) { 
+                } else if (isEmittingJetsRef_anim.current && !p.active && Math.random() < 0.1) { 
                     const pIndex = lastJetParticleIndexRef.current; 
                     const jetP = jetParticleDataRef.current[pIndex]; 
                     if(jetP && !jetP.active) { 
