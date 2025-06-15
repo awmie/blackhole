@@ -111,7 +111,8 @@ uniform sampler2D u_starfieldTexture;
 uniform vec2 u_resolution;          
 uniform float u_lensingStrength;    
 uniform mat4 u_bhModelMatrix;      
-uniform mat4 projectionMatrix; // Explicitly declare, Three.js should provide it if available by this name
+// uniform mat4 projectionMatrix; // Three.js should provide this if named 'projectionMatrix'
+// uniform mat4 viewMatrix; // Three.js should provide this if named 'viewMatrix'
 
 
 float simpleNoise(vec2 st) {
@@ -134,6 +135,7 @@ void main() {
   vec3 normal = normalize(v_normal);
   vec3 viewDir = normalize(u_cameraPosition - v_worldPosition);
 
+  // Sharpened Fresnel effect for a thinner, brighter edge
   float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 8.0) * 2.5;
   fresnel = clamp(fresnel, 0.0, 1.0);
 
@@ -153,6 +155,7 @@ void main() {
   float combinedNoise = (noiseVal1 * 0.6 + noiseVal2 * 0.4); 
   combinedNoise = smoothstep(0.3, 0.7, combinedNoise); 
   
+  // Adjusted effectIntensity for the thinner band
   float effectIntensity = fresnel * combinedNoise * 2.0;
 
   vec4 bhCenterClip = projectionMatrix * viewMatrix * u_bhModelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
@@ -199,35 +202,35 @@ void main() {
 const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
-const JET_PARTICLE_BASE_SIZE = 0.005; // Adjusted size
-const JET_SPREAD_ANGLE = Math.PI / 96; // Thinner jet (was /48)
-const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.01; // Smaller random offset (was 0.025)
+const JET_PARTICLE_BASE_SIZE = 0.005;
+const JET_SPREAD_ANGLE = Math.PI / 96; 
+const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.01; 
 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
-const STAR_DISSOLUTION_EMIT_RATE_PER_FRAME = 20; // Reverted quantity
+const STAR_DISSOLUTION_EMIT_RATE_PER_FRAME = 20; 
 const STAR_DISSOLUTION_PARTICLE_LIFESPAN = 1.5;
 const STAR_DISSOLUTION_PARTICLE_INITIAL_SPEED = 0.3;
 const STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR = 0.5;
-// Star dissolution particle size is set in the loop: particle.size = 0.007 + Math.random() * 0.005;
 
-const STAR_LIGHT_EMIT_RATE_PER_FRAME = 10; // Reverted quantity
+
+const STAR_LIGHT_EMIT_RATE_PER_FRAME = 10; 
 const STAR_LIGHT_PARTICLE_LIFESPAN = 3.0;
 const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05;
 const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02;
-const STAR_LIGHT_PARTICLE_SIZE = 0.005; // Adjusted size
+const STAR_LIGHT_PARTICLE_SIZE = 0.005; 
 const STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND = 0.005;
 const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8;
 
 const SHATTER_PARTICLE_POOL_SIZE = 5000; 
-const SHATTER_PARTICLES_PER_COLLISION = 150; // Reverted quantity
+const SHATTER_PARTICLES_PER_COLLISION = 150; 
 const SHATTER_PARTICLE_LIFESPAN_MIN = 0.8;
 const SHATTER_PARTICLE_LIFESPAN_MAX = 1.8;
 const SHATTER_PARTICLE_SPEED_MIN = 0.5;
 const SHATTER_PARTICLE_SPEED_MAX = 2.5;
 const SHATTER_PARTICLE_GRAVITY_FACTOR = 2.0; 
-const SHATTER_PARTICLE_SIZE_MIN = 0.002; // Adjusted size
-const SHATTER_PARTICLE_SIZE_MAX = 0.005; // Adjusted size
+const SHATTER_PARTICLE_SIZE_MIN = 0.002; 
+const SHATTER_PARTICLE_SIZE_MAX = 0.005; 
 
 
 const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
@@ -818,7 +821,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         particle.life = 1.0; 
                         particle.initialLife = STAR_DISSOLUTION_PARTICLE_LIFESPAN + Math.random() * 0.1;
                         particle.color.copy(starColor);
-                        particle.size = 0.007 + Math.random() * 0.005; // Adjusted size
+                        particle.size = 0.007 + Math.random() * 0.005; 
                     }
                     lastStarEmittedParticleIndexRef.current = (pIndex + 1) % STAR_EMITTED_PARTICLE_COUNT;
                 }
@@ -934,7 +937,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     colorsAttribute[i3] = p.color.r * fade; colorsAttribute[i3 + 1] = p.color.g * fade; colorsAttribute[i3 + 2] = p.color.b * fade;
                     sizesAttribute[i] = p.size * fade;
                     if (p.life <= 0) { p.active = false; positions[i3+1] = -1000; }
-                } else if (isEmittingJetsRef_anim.current && !p.active && Math.random() < 0.25) { // Reverted quantity (spawn rate)
+                } else if (isEmittingJetsRef_anim.current && !p.active && Math.random() < 0.25) { 
                     const pIndex = lastJetParticleIndexRef.current; 
                     const jetP = jetParticleDataRef.current[pIndex]; 
                     if(jetP && !jetP.active) { 
@@ -1104,8 +1107,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       const disposeParticleSystem = (systemRef: React.MutableRefObject<THREE_TYPE.Points | null>) => {
         if (systemRef.current) {
             systemRef.current.geometry.dispose();
-            if (systemRef.current.material instanceof THREE_TYPE.Material) {
-                (systemRef.current.material as THREE_TYPE.Material).dispose();
+            if (THREEInstanceRef.current && systemRef.current.material instanceof THREEInstanceRef.current.Material) {
+                 (systemRef.current.material as THREE_TYPE.Material).dispose();
             }
             foregroundSceneRef.current?.remove(systemRef.current);
             systemRef.current = null;
