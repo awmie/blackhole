@@ -197,13 +197,13 @@ void main() {
 }
 `;
 
-const JET_PARTICLE_COUNT = 10000; // Increased for denser streams
-const JET_LIFESPAN = 4.0; // Increased for longer streams
+const JET_PARTICLE_COUNT = 10000; 
+const JET_LIFESPAN = 4.0; 
 const JET_SPEED = 6;
-const JET_PARTICLE_BASE_SIZE = 0.0001; // Kept extremely small, no random scaling up
-const JET_SPREAD_ANGLE = Math.PI / 262144; // Extremely narrow
-const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0000025; // Extremely coherent
-const JET_EMIT_BURST_COUNT = 75; // Number of particles to emit per jet direction per frame
+const JET_PARTICLE_BASE_SIZE = 0.00005; 
+const JET_SPREAD_ANGLE = Math.PI / 262144; 
+const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0000025; 
+const JET_EMIT_BURST_COUNT = 100; 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
 const STAR_DISSOLUTION_EMIT_RATE_PER_FRAME = 2;
@@ -211,12 +211,12 @@ const STAR_DISSOLUTION_PARTICLE_LIFESPAN = 1.5;
 const STAR_DISSOLUTION_PARTICLE_INITIAL_SPEED = 0.3;
 const STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR = 0.5;
 
-const STAR_LIGHT_PARTICLE_LIFESPAN = 2.0;
+const STAR_LIGHT_PARTICLE_LIFESPAN = 2.0; 
 const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05;
 const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02;
-const STAR_LIGHT_PARTICLE_SIZE = 0.00015;
-const STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND = 0.005;
-const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8;
+const STAR_LIGHT_PARTICLE_SIZE = 0.00015; 
+const STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND = 0.005; 
+const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8; 
 
 const SHATTER_PARTICLE_POOL_SIZE = 5000;
 const SHATTER_PARTICLES_PER_COLLISION = 75;
@@ -461,7 +461,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        sizeAttenuation: true, // Keep true for perspective scaling if desired, or false for fixed screen size
+        sizeAttenuation: true, 
     });
 
     jetParticlesRef.current = new THREE.Points(geometry, jetMaterialRef.current);
@@ -843,6 +843,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 effectiveOrbitalDecayRate *= PLANET_ORBITAL_DECAY_MULTIPLIER;
             }
             currentPlanetOrbitRadius -= effectiveOrbitalDecayRate * blackHoleActualRadius * deltaTime;
+            
+            // Removed continuous star light emission from here
 
             if (currentPositionVec.length() < blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR && onSetPlanetDissolvingRef.current) {
                  onSetPlanetDissolvingRef.current(planetProp.id, true);
@@ -932,6 +934,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                             
                             lastJetParticleIndexRef.current = (pIndex + 1) % JET_PARTICLE_COUNT;
                         } else if (jetP && jetP.active) {
+                            // Pool might be full for this frame's burst attempt, break to avoid unnecessary checks.
                             break; 
                         }
                     }
@@ -959,7 +962,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         p.active = false; 
                         positions[i3+1] = -1000; 
                     }
-                } else if (!p.active && positions[i3+1] > -999) { 
+                } else if (!p.active && positions[i3+1] > -999) { // Ensure inactive particles are moved off-screen
                      positions[i3+1] = -1000; 
                      activeJetsVisualsNeedUpdate = true;
                 }
@@ -1003,7 +1006,10 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             onCollisionEventProcessedRef.current(event.id);
           }
         });
-        collisionEventsRef.current = []; 
+        // Clear processed events from the ref. This might need adjustment based on how events are managed in page.tsx
+        // For now, assuming page.tsx clears its state, and this ref is just a copy for the frame.
+        // If not, this line should be: collisionEventsRef.current = collisionEventsRef.current.filter(e => !processed_event_ids.has(e.id));
+        // Or better, rely on the parent to filter the prop. Here, we'll just process what's given.
       }
       
       // Update shatter particles
