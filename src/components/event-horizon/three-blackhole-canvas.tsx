@@ -71,8 +71,8 @@ const minAngularSpeedFactor = 0.02;
 const photonRingThreshold = 0.03;
 
 const PULL_IN_FACTOR_DISSOLVING = 5.0;
-const CONTINUOUS_ORBITAL_DECAY_RATE = 0.05; 
-const PLANET_ORBITAL_DECAY_MULTIPLIER = 2.0; 
+const CONTINUOUS_ORBITAL_DECAY_RATE = 0.05;
+const PLANET_ORBITAL_DECAY_MULTIPLIER = 2.0;
 
 const DISSOLUTION_START_RADIUS_FACTOR = 1.2;
 const DISSOLUTION_DURATION = 1.5;
@@ -197,37 +197,36 @@ void main() {
 }
 `;
 
-const JET_PARTICLE_COUNT = 2000;
-const JET_LIFESPAN = 2.5; 
-const JET_SPEED = 6; 
-const JET_PARTICLE_BASE_SIZE = 0.00001; // Further reduced jet particle size
+const JET_PARTICLE_COUNT = 10000; // Increased for denser streams
+const JET_LIFESPAN = 4.0; // Increased for longer streams
+const JET_SPEED = 6;
+const JET_PARTICLE_BASE_SIZE = 0.0001; // Kept extremely small, no random scaling up
 const JET_SPREAD_ANGLE = Math.PI / 262144; // Extremely narrow
 const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0000025; // Extremely coherent
-
+const JET_EMIT_BURST_COUNT = 75; // Number of particles to emit per jet direction per frame
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
-const STAR_DISSOLUTION_EMIT_RATE_PER_FRAME = 2; 
+const STAR_DISSOLUTION_EMIT_RATE_PER_FRAME = 2;
 const STAR_DISSOLUTION_PARTICLE_LIFESPAN = 1.5;
 const STAR_DISSOLUTION_PARTICLE_INITIAL_SPEED = 0.3;
 const STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR = 0.5;
 
-
-const STAR_LIGHT_PARTICLE_LIFESPAN = 2.0; 
-const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05; 
-const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02; 
-const STAR_LIGHT_PARTICLE_SIZE = 0.00015; 
+const STAR_LIGHT_PARTICLE_LIFESPAN = 2.0;
+const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05;
+const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02;
+const STAR_LIGHT_PARTICLE_SIZE = 0.00015;
 const STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND = 0.005;
-const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8; 
+const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8;
 
-const SHATTER_PARTICLE_POOL_SIZE = 5000; 
-const SHATTER_PARTICLES_PER_COLLISION = 75; 
+const SHATTER_PARTICLE_POOL_SIZE = 5000;
+const SHATTER_PARTICLES_PER_COLLISION = 75;
 const SHATTER_PARTICLE_LIFESPAN_MIN = 0.8;
 const SHATTER_PARTICLE_LIFESPAN_MAX = 1.8;
 const SHATTER_PARTICLE_SPEED_MIN = 0.5;
 const SHATTER_PARTICLE_SPEED_MAX = 2.5;
-const SHATTER_PARTICLE_GRAVITY_FACTOR = 2.0; 
+const SHATTER_PARTICLE_GRAVITY_FACTOR = 2.0;
 const SHATTER_PARTICLE_SIZE_MIN = 0.0008;
-const SHATTER_PARTICLE_SIZE_MAX = 0.002;  
+const SHATTER_PARTICLE_SIZE_MAX = 0.002;
 
 
 const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
@@ -462,7 +461,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        sizeAttenuation: true,
+        sizeAttenuation: true, // Keep true for perspective scaling if desired, or false for fixed screen size
     });
 
     jetParticlesRef.current = new THREE.Points(geometry, jetMaterialRef.current);
@@ -499,7 +498,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             position: new THREE.Vector3(0, -1000, 0), 
             velocity: new THREE.Vector3(),
             life: 0, 
-            initialLife: STAR_DISSOLUTION_PARTICLE_LIFESPAN, // Default initial life, can be overridden
+            initialLife: STAR_DISSOLUTION_PARTICLE_LIFESPAN, 
             color: new THREE.Color(1, 1, 1),
             size: 0.0005, 
             active: false,
@@ -554,7 +553,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     for (let i = 0; i < SHATTER_PARTICLE_POOL_SIZE; i++) {
       shatterParticleDataRef.current.push({
         id: i,
-        position: new THREE.Vector3(0, -1000, 0), // Start inactive
+        position: new THREE.Vector3(0, -1000, 0), 
         velocity: new THREE.Vector3(),
         life: 0,
         initialLife: 1,
@@ -845,8 +844,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             }
             currentPlanetOrbitRadius -= effectiveOrbitalDecayRate * blackHoleActualRadius * deltaTime;
 
-            if (currentPositionVec.length() < blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR) {
-                if (onSetPlanetDissolvingRef.current) onSetPlanetDissolvingRef.current(planetProp.id, true);
+            if (currentPositionVec.length() < blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR && onSetPlanetDissolvingRef.current) {
+                 onSetPlanetDissolvingRef.current(planetProp.id, true);
             } else if (currentPlanetTimeToLive <= 0 || currentPositionVec.length() < blackHoleActualRadius * 0.1) {
                 if (onAbsorbPlanetRef.current) onAbsorbPlanetRef.current(planetProp.id);
                 evolvingPlanetDataRef.current.delete(planetProp.id);
@@ -869,7 +868,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 hasActiveStarParticles = true;
                 const forceDirection = new THREE_ANIM.Vector3().subVectors(new THREE_ANIM.Vector3(0,0,0), p.position);
                 const distanceSq = Math.max(0.1, p.position.lengthSq());
-                const gravityFactor = STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR; 
+                const gravityFactor = (p.initialLife === STAR_LIGHT_PARTICLE_LIFESPAN) ? STAR_LIGHT_PARTICLE_GRAVITY_FACTOR : STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR;
                 forceDirection.normalize().multiplyScalar(gravityFactor / distanceSq);
                 p.velocity.addScaledVector(forceDirection, deltaTime);
                 p.position.addScaledVector(p.velocity, deltaTime);
@@ -897,47 +896,77 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             const positions = jetParticlesRef.current.geometry.attributes.position.array as Float32Array;
             const colorsAttribute = jetParticlesRef.current.geometry.attributes.color.array as Float32Array;
             const sizesAttribute = jetParticlesRef.current.geometry.attributes.size.array as Float32Array;
-            let activeJets = false;
+            let activeJetsVisualsNeedUpdate = false;
+
+            if (isEmittingJetsRef_anim.current) {
+                for (let jetDirection of [1, -1]) { // 1 for up, -1 for down
+                    for (let i = 0; i < JET_EMIT_BURST_COUNT; i++) {
+                        const pIndex = lastJetParticleIndexRef.current;
+                        const jetP = jetParticleDataRef.current[pIndex];
+                        if (jetP && !jetP.active) {
+                            jetP.active = true;
+                            activeJetsVisualsNeedUpdate = true;
+                            
+                            jetP.position.set(0, jetDirection * blackHoleRadiusRef_anim.current * 1.05, 0);
+                            
+                            const coneAngle = Math.random() * Math.PI * 2;
+                            const elevationAngle = (Math.random() * JET_SPREAD_ANGLE) - (JET_SPREAD_ANGLE / 2);
+                            let velDir = new THREE_ANIM.Vector3(
+                                Math.sin(elevationAngle) * Math.cos(coneAngle),
+                                Math.cos(elevationAngle) * jetDirection,
+                                Math.sin(elevationAngle) * Math.sin(coneAngle)
+                            );
+                            const randomOffset = new THREE_ANIM.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
+                                                    .normalize().multiplyScalar(JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE);
+                            velDir.add(randomOffset).normalize();
+                            
+                            jetP.velocity.copy(velDir).multiplyScalar(JET_SPEED * (0.7 + Math.random() * 0.6));
+                            jetP.life = 1.0; 
+                            jetP.initialLife = JET_LIFESPAN * (0.6 + Math.random() * 0.8);
+                            jetP.color.setHSL(Math.random() * 0.15 + 0.50, 0.95, 0.85); 
+                            jetP.size = JET_PARTICLE_BASE_SIZE;
+
+                            positions[pIndex*3] = jetP.position.x; 
+                            positions[pIndex*3+1] = jetP.position.y; 
+                            positions[pIndex*3+2] = jetP.position.z;
+                            
+                            lastJetParticleIndexRef.current = (pIndex + 1) % JET_PARTICLE_COUNT;
+                        } else if (jetP && jetP.active) {
+                            break; 
+                        }
+                    }
+                }
+            }
 
             jetParticleDataRef.current.forEach((p, i) => {
                 const i3 = i * 3;
                 if (p.active && p.life > 0) {
-                    activeJets = true;
+                    activeJetsVisualsNeedUpdate = true;
                     p.position.addScaledVector(p.velocity, deltaTime);
                     p.life -= deltaTime / p.initialLife;
-                    positions[i3] = p.position.x; positions[i3 + 1] = p.position.y; positions[i3 + 2] = p.position.z;
+                    
+                    positions[i3] = p.position.x; 
+                    positions[i3 + 1] = p.position.y; 
+                    positions[i3 + 2] = p.position.z;
+                    
                     const fade = Math.max(0, p.life);
-                    colorsAttribute[i3] = p.color.r * fade; colorsAttribute[i3 + 1] = p.color.g * fade; colorsAttribute[i3 + 2] = p.color.b * fade;
+                    colorsAttribute[i3] = p.color.r * fade; 
+                    colorsAttribute[i3 + 1] = p.color.g * fade; 
+                    colorsAttribute[i3 + 2] = p.color.b * fade;
                     sizesAttribute[i] = p.size * fade; 
-                    if (p.life <= 0) { p.active = false; positions[i3+1] = -1000; }
-                } else if (isEmittingJetsRef_anim.current && !p.active && Math.random() < 0.15) { 
-                    const pIndex = lastJetParticleIndexRef.current; 
-                    const jetP = jetParticleDataRef.current[pIndex]; 
-                    if(jetP && !jetP.active) { 
-                        jetP.active = true;
-                        activeJets = true;
-                        const direction = Math.random() > 0.5 ? 1 : -1;
-                        jetP.position.set(0, direction * blackHoleRadiusRef_anim.current * 1.05, 0);
-                        
-                        const coneAngle = Math.random() * Math.PI * 2; 
-                        const elevationAngle = (Math.random() * JET_SPREAD_ANGLE) - (JET_SPREAD_ANGLE / 2); 
-                        let velDir = new THREE_ANIM.Vector3(Math.sin(elevationAngle) * Math.cos(coneAngle), Math.cos(elevationAngle) * direction, Math.sin(elevationAngle) * Math.sin(coneAngle));
-                        const randomOffset = new THREE_ANIM.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE); 
-                        velDir.add(randomOffset);
-                        jetP.velocity.copy(velDir.normalize().multiplyScalar(JET_SPEED * (0.7 + Math.random() * 0.6))); 
-                        jetP.life = 1.0; 
-                        jetP.initialLife = JET_LIFESPAN * (0.6 + Math.random() * 0.8); 
-                        jetP.color.setHSL(Math.random() * 0.15 + 0.50, 0.95, 0.75); 
-                        jetP.size = JET_PARTICLE_BASE_SIZE;
-                        positions[pIndex*3] = jetP.position.x; positions[pIndex*3+1] = jetP.position.y; positions[pIndex*3+2] = jetP.position.z; 
-                        lastJetParticleIndexRef.current = (pIndex + 1) % JET_PARTICLE_COUNT;
+                    
+                    if (p.life <= 0) { 
+                        p.active = false; 
+                        positions[i3+1] = -1000; 
                     }
                 } else if (!p.active && positions[i3+1] > -999) { 
-                     positions[i3+1] = -1000; activeJets = true; 
+                     positions[i3+1] = -1000; 
+                     activeJetsVisualsNeedUpdate = true;
                 }
             });
-            jetParticlesRef.current.visible = activeJets || isEmittingJetsRef_anim.current; 
-            if (activeJets || (isEmittingJetsRef_anim.current && jetParticlesRef.current.visible)) { 
+            
+            jetParticlesRef.current.visible = activeJetsVisualsNeedUpdate || isEmittingJetsRef_anim.current; 
+            if (activeJetsVisualsNeedUpdate) { 
               jetParticlesRef.current.geometry.attributes.position.needsUpdate = true;
               jetParticlesRef.current.geometry.attributes.color.needsUpdate = true;
               jetParticlesRef.current.geometry.attributes.size.needsUpdate = true;
@@ -964,8 +993,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 (Math.random() - 0.5)
               ).normalize().multiplyScalar(SHATTER_PARTICLE_SPEED_MIN + Math.random() * (SHATTER_PARTICLE_SPEED_MAX - SHATTER_PARTICLE_SPEED_MIN));
               particle.initialLife = SHATTER_PARTICLE_LIFESPAN_MIN + Math.random() * (SHATTER_PARTICLE_LIFESPAN_MAX - SHATTER_PARTICLE_LIFESPAN_MIN);
-              particle.life = 1.0; // Normalized life
-              particle.color.copy(Math.random() > 0.5 ? color1 : color2); // Mix or pick
+              particle.life = 1.0; 
+              particle.color.copy(Math.random() > 0.5 ? color1 : color2); 
               particle.size = SHATTER_PARTICLE_SIZE_MIN + Math.random() * (SHATTER_PARTICLE_SIZE_MAX - SHATTER_PARTICLE_SIZE_MIN); 
             }
             lastShatterParticleIndexRef.current = (pIndex + 1) % SHATTER_PARTICLE_POOL_SIZE;
@@ -974,7 +1003,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             onCollisionEventProcessedRef.current(event.id);
           }
         });
-         // Clear processed events locally to avoid re-processing if parent state update is slow
         collisionEventsRef.current = []; 
       }
       
