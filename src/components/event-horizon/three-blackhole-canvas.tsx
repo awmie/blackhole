@@ -200,7 +200,7 @@ void main() {
 const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
-const JET_PARTICLE_BASE_SIZE = 0.0002;
+const JET_PARTICLE_BASE_SIZE = 0.0001; // Further reduced jet particle size
 const JET_SPREAD_ANGLE = Math.PI / 262144; // Extremely narrow
 const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0000025; // Extremely coherent
 
@@ -854,11 +854,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             }
             currentPlanetOrbitRadius = Math.max(currentPlanetOrbitRadius, blackHoleActualRadius * 0.05);
 
-            if (planetProp.type === 'star') {
-                 if (currentPositionVec.length() < blackHoleActualRadius * STAR_LIGHT_EMISSION_PROXIMITY_FACTOR && onStarMassLossRef.current) {
-                        onStarMassLossRef.current(planetProp.id, STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND * deltaTime);
-                 }
-            }
+             // Removed continuous light trail emission logic here
         }
         evolvingData.radius = currentPlanetOrbitRadius;
         object3D.position.set(currentPlanetOrbitRadius * Math.cos(currentPlanetAngle), planetProp.yOffset, currentPlanetOrbitRadius * Math.sin(currentPlanetAngle));
@@ -916,7 +912,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     colorsAttribute[i3] = p.color.r * fade; colorsAttribute[i3 + 1] = p.color.g * fade; colorsAttribute[i3 + 2] = p.color.b * fade;
                     sizesAttribute[i] = p.size * fade; // Apply fade to size as well
                     if (p.life <= 0) { p.active = false; positions[i3+1] = -1000; }
-                } else if (isEmittingJetsRef_anim.current && !p.active && Math.random() < 0.15) { // Emission rate slightly increased
+                } else if (isEmittingJetsRef_anim.current && !p.active && Math.random() < 0.15) { 
                     const pIndex = lastJetParticleIndexRef.current; 
                     const jetP = jetParticleDataRef.current[pIndex]; 
                     if(jetP && !jetP.active) { 
@@ -934,7 +930,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         jetP.life = 1.0; 
                         jetP.initialLife = JET_LIFESPAN * (0.6 + Math.random() * 0.8); 
                         jetP.color.setHSL(Math.random() * 0.15 + 0.50, 0.95, 0.75); 
-                        jetP.size = JET_PARTICLE_BASE_SIZE; // No random scaling
+                        jetP.size = JET_PARTICLE_BASE_SIZE; // Use base size directly
                         positions[pIndex*3] = jetP.position.x; positions[pIndex*3+1] = jetP.position.y; positions[pIndex*3+2] = jetP.position.z; 
                         lastJetParticleIndexRef.current = (pIndex + 1) % JET_PARTICLE_COUNT;
                     }
@@ -1267,3 +1263,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
     
+
