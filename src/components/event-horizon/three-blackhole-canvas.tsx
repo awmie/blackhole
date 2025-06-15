@@ -651,7 +651,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
     controls.minDistance = blackHoleRadiusRef_anim.current * 1.2;
-    controls.maxDistance = 500;
+    controls.maxDistance = 80; // Updated maxDistance
     controlsRef.current = controls;
 
     controls.addEventListener('change', () => {
@@ -1290,4 +1290,3 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
     
-
