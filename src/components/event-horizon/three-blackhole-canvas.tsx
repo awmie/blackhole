@@ -111,8 +111,8 @@ uniform sampler2D u_starfieldTexture;
 uniform vec2 u_resolution;          
 uniform float u_lensingStrength;    
 uniform mat4 u_bhModelMatrix;      
-// uniform mat4 projectionMatrix; // Three.js should provide this if named 'projectionMatrix'
-// uniform mat4 viewMatrix; // Three.js should provide this if named 'viewMatrix'
+uniform mat4 projectionMatrix; // Three.js should provide this if named 'projectionMatrix'
+// viewMatrix is implicitly available
 
 
 float simpleNoise(vec2 st) {
@@ -203,8 +203,8 @@ const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
 const JET_PARTICLE_BASE_SIZE = 0.005;
-const JET_SPREAD_ANGLE = Math.PI / 96; 
-const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.01; 
+const JET_SPREAD_ANGLE = Math.PI / 192; 
+const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.005; 
 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
