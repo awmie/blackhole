@@ -176,7 +176,7 @@ void main() {
   vec2 normalizedDirFromCenter = normalize(dirFromCenterToFrag); 
   
   vec2 tangentDir = vec2(-normalizedDirFromCenter.y, normalizedDirFromCenter.x); 
-  float swirlFactor = 0.6; 
+  float swirlFactor = 0.1; // Reduced swirlFactor
   
   float swirlPowerFalloff = smoothstep(0.0, 0.3, distFragToCenterScreen); 
   swirlFactor *= swirlPowerFalloff;
@@ -693,7 +693,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         u_cameraPosition: { value: camera.position },
         u_starfieldTexture: { value: sceneCaptureRenderTargetRef.current?.texture || null }, 
         u_resolution: { value: new THREE.Vector2(mountRef.current.clientWidth, mountRef.current.clientHeight) },
-        u_lensingStrength: { value: 0.12 }, 
+        u_lensingStrength: { value: 0.25 }, // Increased lensing strength
         u_bhModelMatrix: { value: new THREE.Matrix4() },
       },
     });
