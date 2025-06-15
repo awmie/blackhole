@@ -204,10 +204,10 @@ void main() {
 const JET_PARTICLE_COUNT = 10000; 
 const JET_LIFESPAN = 4.0; 
 const JET_SPEED = 6;
-const JET_PARTICLE_BASE_SIZE = 0.01; 
-const JET_SPREAD_ANGLE = Math.PI / 262144; 
-const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0000025; 
-const JET_EMIT_BURST_COUNT = 100; 
+const JET_PARTICLE_BASE_SIZE = 0.003; 
+const JET_SPREAD_ANGLE = Math.PI / 16384; 
+const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0005; 
+const JET_EMIT_BURST_COUNT = 150; 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
 const STAR_DISSOLUTION_EMIT_RATE_PER_FRAME = 2;
@@ -911,6 +911,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         const jetP = jetParticleDataRef.current[pIndex];
                         if (jetP && !jetP.active) {
                             activeJetsVisualsNeedUpdate = true;
+                            jetP.active = true; // Activate the particle
                             
                             jetP.position.set(0, jetDirection * blackHoleRadiusRef_anim.current * 1.05, 0);
                             
@@ -929,7 +930,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                             jetP.life = 1.0; 
                             jetP.initialLife = JET_LIFESPAN * (0.6 + Math.random() * 0.8);
                             jetP.color.setHSL(Math.random() * 0.15 + 0.50, 0.95, 0.85); 
-                            jetP.size = JET_PARTICLE_BASE_SIZE;
+                            jetP.size = JET_PARTICLE_BASE_SIZE; 
 
                             positions[pIndex*3] = jetP.position.x; 
                             positions[pIndex*3+1] = jetP.position.y; 
@@ -967,11 +968,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                     }
                 } else if (!p.active && positions[i3+1] > -999) { // Ensure inactive particles are moved off-screen
                      positions[i3+1] = -1000; 
-                     activeJetsVisualsNeedUpdate = true;
+                     activeJetsVisualsNeedUpdate = true; // Still need update to clear their old positions
                 }
             });
             
-            jetParticlesRef.current.visible = activeJetsVisualsNeedUpdate || isEmittingJetsRef_anim.current; 
+            jetParticlesRef.current.visible = true; // Always keep Points object visible if it exists
             if (activeJetsVisualsNeedUpdate) { 
               jetParticlesRef.current.geometry.attributes.position.needsUpdate = true;
               jetParticlesRef.current.geometry.attributes.color.needsUpdate = true;
