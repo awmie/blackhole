@@ -222,9 +222,16 @@ const SHATTER_PARTICLE_LIFESPAN_MIN = 0.8;
 const SHATTER_PARTICLE_LIFESPAN_MAX = 1.8;
 const SHATTER_PARTICLE_SPEED_MIN = 0.5;
 const SHATTER_PARTICLE_SPEED_MAX = 2.5;
-const SHATTER_PARTICLE_GRAVITY_FACTOR = 2.0;
 const SHATTER_PARTICLE_SIZE_MIN = 0.0008;
 const SHATTER_PARTICLE_SIZE_MAX = 0.002;
+
+// New constants for distance-dependent shatter particle behavior
+const SHATTER_PARTICLE_GRAVITY_FACTOR_BASE = 0.2; // Base gravity pull (weaker when far)
+const SHATTER_PARTICLE_NEAR_BH_THRESHOLD_FACTOR = 5.0; // Distance factor to define "near BH" (e.g., 5 * blackHoleRadius)
+const SHATTER_PARTICLE_GRAVITY_BOOST_NEAR_BH = 15.0; // Multiplier for gravity when near BH (0.2 * 15 = 3.0 effective near BH)
+const SHATTER_PARTICLE_SPIRAL_STRENGTH_NEAR_BH = 0.2; // How strongly particles spiral when near BH
+const SHATTER_PARTICLE_QUICK_ABSORPTION_RADIUS_FACTOR = 1.2; // If particle gets this close to BH (e.g. 1.2 * blackHoleRadius)
+const SHATTER_PARTICLE_LIFESPAN_REDUCTION_NEAR_ABSORPTION = 6.0; // Multiplier for lifespan reduction when very close
 
 
 const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
@@ -1005,29 +1012,56 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       }
       
       // Update shatter particles
-      if (shatterParticlesRef.current?.geometry && shatterParticleDataRef.current.length > 0 && THREE_ANIM) {
+      if (shatterParticlesRef.current?.geometry && shatterParticleDataRef.current.length > 0 && THREE_ANIM && tempVectorRef.current) {
         const positions = shatterParticlesRef.current.geometry.attributes.position.array as Float32Array;
         const colors = shatterParticlesRef.current.geometry.attributes.color.array as Float32Array;
         const sizes = shatterParticlesRef.current.geometry.attributes.size.array as Float32Array;
         let hasActiveShatterParticles = false;
+        const blackHoleActualRadius = blackHoleRadiusRef_anim.current;
 
         shatterParticleDataRef.current.forEach((p, i) => {
           const i3 = i * 3;
           if (p.active && p.life > 0) {
             hasActiveShatterParticles = true;
-            const forceDirection = new THREE_ANIM.Vector3().subVectors(new THREE_ANIM.Vector3(0,0,0), p.position);
-            const distanceSq = Math.max(0.1, p.position.lengthSq());
-            forceDirection.normalize().multiplyScalar(SHATTER_PARTICLE_GRAVITY_FACTOR / distanceSq);
+            
+            const distanceToBHSq = p.position.lengthSq();
+            let effectiveGravityFactor = SHATTER_PARTICLE_GRAVITY_FACTOR_BASE;
+
+            const nearBHThresholdRadius = blackHoleActualRadius * SHATTER_PARTICLE_NEAR_BH_THRESHOLD_FACTOR;
+            const isNearBH = distanceToBHSq < (nearBHThresholdRadius * nearBHThresholdRadius);
+
+            const quickAbsorptionRadius = blackHoleActualRadius * SHATTER_PARTICLE_QUICK_ABSORPTION_RADIUS_FACTOR;
+            const isVeryCloseToBH = distanceToBHSq < (quickAbsorptionRadius * quickAbsorptionRadius);
+
+            if (isNearBH) {
+                effectiveGravityFactor *= SHATTER_PARTICLE_GRAVITY_BOOST_NEAR_BH;
+                if (SHATTER_PARTICLE_SPIRAL_STRENGTH_NEAR_BH > 0 && tempVectorRef.current) {
+                    const tangentDirection = tempVectorRef.current.set(-p.position.z, 0, p.position.x).normalize(); // Assumes XZ plane for spiral
+                    const closenessFactor = Math.max(0, 1.0 - (Math.sqrt(distanceToBHSq) / nearBHThresholdRadius));
+                    const spiralMagnitude = SHATTER_PARTICLE_SPIRAL_STRENGTH_NEAR_BH * closenessFactor * effectiveGravityFactor * deltaTime;
+                    p.velocity.addScaledVector(tangentDirection, spiralMagnitude);
+                }
+            }
+            
+            const forceDirection = tempVectorRef.current.copy(p.position).negate(); // Points towards origin (0,0,0)
+            const invDistanceSq = 1.0 / Math.max(0.01, distanceToBHSq); // Avoid division by zero
+            forceDirection.normalize().multiplyScalar(effectiveGravityFactor * blackHoleActualRadius * invDistanceSq);
+
             p.velocity.addScaledVector(forceDirection, deltaTime);
             p.position.addScaledVector(p.velocity, deltaTime);
-            p.life -= deltaTime / p.initialLife;
+            
+            let lifeReductionFactor = 1.0;
+            if (isVeryCloseToBH) {
+                lifeReductionFactor = SHATTER_PARTICLE_LIFESPAN_REDUCTION_NEAR_ABSORPTION;
+            }
+            p.life -= (deltaTime / p.initialLife) * lifeReductionFactor;
 
             positions[i3] = p.position.x; positions[i3 + 1] = p.position.y; positions[i3 + 2] = p.position.z;
             const fade = Math.max(0, p.life);
             colors[i3] = p.color.r * fade; colors[i3 + 1] = p.color.g * fade; colors[i3 + 2] = p.color.b * fade;
             sizes[i] = p.size * fade;
 
-            if (p.life <= 0 || p.position.lengthSq() < (blackHoleRadiusRef_anim.current * blackHoleRadiusRef_anim.current * 0.01)) {
+            if (p.life <= 0 || distanceToBHSq < (blackHoleActualRadius * blackHoleActualRadius * 0.9)) {
               p.active = false; positions[i3+1] = -1000; 
             }
           } else if (!p.active && positions[i3+1] > -999) {
