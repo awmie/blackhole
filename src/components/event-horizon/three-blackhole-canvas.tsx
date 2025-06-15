@@ -111,7 +111,7 @@ uniform sampler2D u_starfieldTexture;
 uniform vec2 u_resolution;          
 uniform float u_lensingStrength;    
 uniform mat4 u_bhModelMatrix;      
-uniform mat4 projectionMatrix; // Explicitly declare projectionMatrix
+uniform mat4 projectionMatrix; 
 
 
 float simpleNoise(vec2 st) {
@@ -199,7 +199,7 @@ void main() {
 const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
-const JET_PARTICLE_BASE_SIZE = 0.02;
+const JET_PARTICLE_BASE_SIZE = 0.01;
 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
@@ -223,8 +223,8 @@ const SHATTER_PARTICLE_LIFESPAN_MAX = 1.8;
 const SHATTER_PARTICLE_SPEED_MIN = 0.5;
 const SHATTER_PARTICLE_SPEED_MAX = 2.5;
 const SHATTER_PARTICLE_GRAVITY_FACTOR = 2.0; // Stronger pull for debris
-const SHATTER_PARTICLE_SIZE_MIN = 0.008;
-const SHATTER_PARTICLE_SIZE_MAX = 0.02;
+const SHATTER_PARTICLE_SIZE_MIN = 0.004;
+const SHATTER_PARTICLE_SIZE_MAX = 0.01;
 
 
 const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
@@ -669,7 +669,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         u_resolution: { value: new THREE.Vector2(mountRef.current.clientWidth, mountRef.current.clientHeight) },
         u_lensingStrength: { value: 0.12 }, 
         u_bhModelMatrix: { value: new THREE.Matrix4() },
-        projectionMatrix: { value: camera.projectionMatrix } // Provide projectionMatrix
+        projectionMatrix: { value: camera.projectionMatrix } 
       },
     });
     const blackHoleMesh = new THREE.Mesh(blackHoleGeometry, blackHoleMaterialRef.current);
@@ -1045,6 +1045,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
       renderer_anim.setRenderTarget(sceneRT_anim);
       renderer_anim.clear();
       if (bgScene_anim) renderer_anim.render(bgScene_anim, mainCam_anim); 
+      renderer_anim.clearDepth(); // Clear depth before rendering foreground elements into the same target
       if (fgScene_anim) renderer_anim.render(fgScene_anim, mainCam_anim); 
       if (bh_anim) bh_anim.visible = true; 
 
