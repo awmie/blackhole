@@ -68,7 +68,7 @@ const COLLISION_CHECK_RADIUS_MULTIPLIER_STAR = 0.8;   // Adjust for tighter coll
 
 export default function Home() {
   const [blackHoleRadius, setBlackHoleRadius] = useState(1);
-  const [accretionDiskInnerRadius, setAccretionDiskInnerRadius] = useState(1.5);
+  const [accretionDiskInnerRadius, setAccretionDiskInnerRadius] = useState(0);
   const [accretionDiskOuterRadius, setAccretionDiskOuterRadius] = useState(3);
   const [accretionDiskOpacity, setAccretionDiskOpacity] = useState(0.8);
   const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 2, z: 5 });
@@ -93,27 +93,25 @@ export default function Home() {
 
   const handleBlackHoleRadiusChange = (value: number) => {
     setBlackHoleRadius(value);
-    if (accretionDiskInnerRadius <= value) {
-      const newInner = value + 0.1;
-      setAccretionDiskInnerRadius(newInner);
-      if (accretionDiskOuterRadius <= newInner) {
-        setAccretionDiskOuterRadius(newInner + 0.2);
-      }
-    }
+    // Accretion disk radii are now independent of black hole radius changes for their minimums.
+    // The visual occlusion is handled by Three.js rendering.
   };
 
   const handleAccretionDiskInnerRadiusChange = (value: number) => {
-    if (value > blackHoleRadius) {
+    if (value >= 0 && value < accretionDiskOuterRadius) {
       setAccretionDiskInnerRadius(value);
-      if (accretionDiskOuterRadius <= value) {
-        setAccretionDiskOuterRadius(value + 0.2);
-      }
+    } else if (value >= accretionDiskOuterRadius) {
+      // Prevent inner radius from exceeding or equaling outer radius
+      setAccretionDiskInnerRadius(Math.max(0, accretionDiskOuterRadius - 0.1));
     }
   };
 
   const handleAccretionDiskOuterRadiusChange = (value: number) => {
-    if (value > accretionDiskInnerRadius) {
+    if (value > accretionDiskInnerRadius && value >= 0.1) { // Ensure outer is greater and has a minimal sensible size
       setAccretionDiskOuterRadius(value);
+    } else if (value <= accretionDiskInnerRadius) {
+       // Prevent outer radius from being less than or equal to inner radius
+      setAccretionDiskOuterRadius(accretionDiskInnerRadius + 0.1);
     }
   };
 
@@ -123,18 +121,22 @@ export default function Home() {
 
     let objectOrbitRadius, currentAngle, yOffset;
 
+    const effectiveInnerRadius = Math.max(accretionDiskInnerRadius, blackHoleRadius * 0.5); // Ensure spawning happens in a visible/active region for calculation
+
     if (clickPosition) {
       objectOrbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
       currentAngle = Math.atan2(clickPosition.z, clickPosition.x);
       yOffset = clickPosition.y;
       objectOrbitRadius = Math.max(objectOrbitRadius, blackHoleRadius * 0.98); 
     } else {
-      objectOrbitRadius = accretionDiskInnerRadius + (accretionDiskOuterRadius - accretionDiskInnerRadius) * (0.2 + Math.random() * 0.8);
+      objectOrbitRadius = effectiveInnerRadius + (accretionDiskOuterRadius - effectiveInnerRadius) * (0.2 + Math.random() * 0.8);
       currentAngle = Math.random() * Math.PI * 2;
       yOffset = (Math.random() - 0.5) * 0.1;
     }
+    
+    objectOrbitRadius = Math.max(objectOrbitRadius, 0.01); // Ensure orbit radius is not zero
 
-    let angularVelocity = SPAWNED_OBJECT_BASE_SPEED * Math.pow(accretionDiskInnerRadius / objectOrbitRadius, 2.5);
+    let angularVelocity = SPAWNED_OBJECT_BASE_SPEED * Math.pow(Math.max(0.1, effectiveInnerRadius) / objectOrbitRadius, 2.5);
     angularVelocity = Math.max(angularVelocity, SPAWNED_OBJECT_BASE_SPEED * SPAWNED_OBJECT_MIN_SPEED_FACTOR);
     angularVelocity *= SPAWNED_OBJECT_SPEED_SCALAR * simulationSpeed; 
     angularVelocity = Math.abs(angularVelocity);
@@ -168,7 +170,7 @@ export default function Home() {
       timeToLive: timeToLive,
       isDissolving: false,
       currentMassFactor,
-      position: { // Initial rough position, canvas will update accurately
+      position: { 
         x: objectOrbitRadius * Math.cos(currentAngle),
         y: yOffset,
         z: objectOrbitRadius * Math.sin(currentAngle),
@@ -231,12 +233,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // Collision detection logic
     const activeObjects = spawnedObjects.filter(obj => !obj.isDissolving);
     if (activeObjects.length < 2) return;
 
     const newCollisionEvents: CollisionEvent[] = [];
-    const updatedObjects = [...spawnedObjects]; // Create a mutable copy
+    const updatedObjects = [...spawnedObjects]; 
     let collisionOccurredThisTick = false;
 
     for (let i = 0; i < activeObjects.length; i++) {
@@ -244,7 +245,7 @@ export default function Home() {
         const obj1 = activeObjects[i];
         const obj2 = activeObjects[j];
 
-        if (!obj1.position || !obj2.position) continue; // Position not updated yet
+        if (!obj1.position || !obj2.position) continue; 
 
         const pairKey1 = `${obj1.id}-${obj2.id}`;
         const pairKey2 = `${obj2.id}-${obj1.id}`;
@@ -265,9 +266,8 @@ export default function Home() {
                         : obj2.initialScale.x * COLLISION_CHECK_RADIUS_MULTIPLIER_PLANET;
         
         if (distance < radius1 + radius2) {
-          // Collision detected
           const collisionPoint = {
-            x: obj1.position.x + dx * (radius1 / (radius1 + radius2)), // Midpoint weighted by radius, roughly
+            x: obj1.position.x + dx * (radius1 / (radius1 + radius2)), 
             y: obj1.position.y + dy * (radius1 / (radius1 + radius2)),
             z: obj1.position.z + dz * (radius1 / (radius1 + radius2)),
           };
@@ -308,15 +308,11 @@ export default function Home() {
     if (collisionOccurredThisTick) {
       setSpawnedObjects(updatedObjects);
     }
-    // Clear recentlyCollidedPairs for next frame/tick if needed, or manage its size
-    // For now, this simple set might grow. A better approach for persistent recentlyCollidedPairs
-    // would involve removing them after the objects are fully absorbed.
-    // For simplicity here, let's clear it periodically or when objects are absorbed.
-    // This effect ensures a pair doesn't continually trigger if logic runs fast.
-    const timeoutId = setTimeout(() => recentlyCollidedPairs.current.clear(), 500); // Clear after a short delay
+    
+    const timeoutId = setTimeout(() => recentlyCollidedPairs.current.clear(), 500); 
     return () => clearTimeout(timeoutId);
 
-  }, [spawnedObjects, simulationSpeed]); // simulationSpeed ensures re-check if dynamics change
+  }, [spawnedObjects, simulationSpeed]); 
 
   const handleCollisionEventProcessed = useCallback((eventId: string) => {
     setCollisionEvents(prev => prev.filter(event => event.id !== eventId));
@@ -345,8 +341,11 @@ export default function Home() {
               <span className="sr-only">Toggle Controls</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-[350px] sm:w-[400px] bg-sidebar text-sidebar-foreground border-sidebar-border p-0">
-            <SheetHeader className="p-4 border-b border-sidebar-border">
+          <SheetContent 
+            side="right" 
+            className="w-[350px] sm:w-[400px] bg-sidebar/80 backdrop-blur-md text-sidebar-foreground border-sidebar-border/50 p-0"
+          >
+            <SheetHeader className="p-4 border-b border-sidebar-border/50">
               <SheetTitle className="text-xl font-headline text-sidebar-foreground">Simulation Controls</SheetTitle>
             </SheetHeader>
             <ControlPanel

@@ -24,7 +24,7 @@ interface ControlPanelProps {
   onSpawnObjectClick: () => void;
   selectedObjectType: 'planet' | 'star';
   setSelectedObjectType: (type: 'planet' | 'star') => void;
-  onManualJetEmissionClick: () => void; // Still here for the button inside the panel
+  onManualJetEmissionClick: () => void; 
   simulationSpeed: number;
   setSimulationSpeed: (value: number) => void;
 }
@@ -51,7 +51,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-6">
-        <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
+        <Card className="bg-sidebar/70 text-sidebar-foreground border-sidebar-border/50 shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl font-headline flex items-center"><Sun className="mr-2 h-6 w-6 text-sidebar-primary" /> Black Hole</CardTitle>
           </CardHeader>
@@ -73,7 +73,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </CardContent>
         </Card>
 
-        <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
+        <Card className="bg-sidebar/70 text-sidebar-foreground border-sidebar-border/50 shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl font-headline flex items-center"><Layers className="mr-2 h-6 w-6 text-sidebar-primary" /> Accretion Disk</CardTitle>
           </CardHeader>
@@ -84,7 +84,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </Label>
               <Slider
                 id="accretionDiskInnerRadius"
-                min={blackHoleRadius + 0.1}
+                min={0} 
                 max={10}
                 step={0.1}
                 value={[accretionDiskInnerRadius]}
@@ -123,7 +123,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </CardContent>
         </Card>
 
-        <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
+        <Card className="bg-sidebar/70 text-sidebar-foreground border-sidebar-border/50 shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl font-headline flex items-center"><Atom className="mr-2 h-6 w-6 text-sidebar-primary" /> Object & Effects</CardTitle>
           </CardHeader>
@@ -153,7 +153,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </CardContent>
         </Card>
         
-        <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
+        <Card className="bg-sidebar/70 text-sidebar-foreground border-sidebar-border/50 shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl font-headline flex items-center"><Gauge className="mr-2 h-6 w-6 text-sidebar-primary" /> Simulation Speed</CardTitle>
           </CardHeader>
@@ -175,9 +175,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </CardContent>
         </Card>
 
-        <Separator className="my-6 bg-sidebar-border" />
+        <Separator className="my-6 bg-sidebar-border/50" />
 
-        <Card className="bg-sidebar text-sidebar-foreground border-sidebar-border shadow-lg">
+        <Card className="bg-sidebar/70 text-sidebar-foreground border-sidebar-border/50 shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl font-headline flex items-center"><Database className="mr-2 h-6 w-6 text-sidebar-primary" /> Simulation Data</CardTitle>
           </CardHeader>
