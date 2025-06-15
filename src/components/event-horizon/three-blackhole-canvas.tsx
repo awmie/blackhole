@@ -111,9 +111,8 @@ uniform sampler2D u_starfieldTexture;
 uniform vec2 u_resolution;          
 uniform float u_lensingStrength;    
 uniform mat4 u_bhModelMatrix;      
-uniform mat4 projectionMatrix; // Three.js should provide this if named 'projectionMatrix'
-// viewMatrix is implicitly available
-
+uniform mat4 projectionMatrix; 
+// viewMatrix is implicitly available by that name in fragment shaders if standard material uniforms are used by Three.js
 
 float simpleNoise(vec2 st) {
     return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
@@ -203,18 +202,18 @@ const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
 const JET_PARTICLE_BASE_SIZE = 0.005;
-const JET_SPREAD_ANGLE = Math.PI / 192; 
-const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.005; 
+const JET_SPREAD_ANGLE = Math.PI / 384; // Halved for thinner jet
+const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0025; // Halved for thinner jet
 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
-const STAR_DISSOLUTION_EMIT_RATE_PER_FRAME = 20; 
+const STAR_DISSOLUTION_EMIT_RATE_PER_FRAME = 5; 
 const STAR_DISSOLUTION_PARTICLE_LIFESPAN = 1.5;
 const STAR_DISSOLUTION_PARTICLE_INITIAL_SPEED = 0.3;
 const STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR = 0.5;
 
 
-const STAR_LIGHT_EMIT_RATE_PER_FRAME = 10; 
+const STAR_LIGHT_EMIT_RATE_PER_FRAME = 3; 
 const STAR_LIGHT_PARTICLE_LIFESPAN = 3.0;
 const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05;
 const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02;
