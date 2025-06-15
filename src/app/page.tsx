@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Info, Zap } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/github-icon';
 
 
 export interface PlanetState {
@@ -417,6 +418,19 @@ export default function Home() {
         </Sheet>
       </div>
 
+      <div className="absolute bottom-4 left-4 z-20">
+        <a
+          href="https://github.com/awmie"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center h-10 w-10 rounded-md border border-input bg-card/70 backdrop-blur-md text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          title="View on GitHub"
+        >
+          <GithubIcon className="h-5 w-5" />
+          <span className="sr-only">View on GitHub</span>
+        </a>
+      </div>
+
       <div className="flex-1 w-full h-full">
         <Suspense fallback={<Skeleton className="w-full h-full bg-muted-foreground/20 rounded-none" />}>
           <ThreeBlackholeCanvas
@@ -442,4 +456,3 @@ export default function Home() {
     </div>
   );
 }
-
