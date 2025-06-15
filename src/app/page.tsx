@@ -13,20 +13,20 @@ import { Info, Zap } from 'lucide-react';
 export interface PlanetState {
   id: number;
   type: 'planet' | 'star';
-  orbitRadius: number; // Used for initial placement
-  currentAngle: number; // Used for initial placement
-  velocity: { x: number; y: number; z: number }; // Initial velocity
+  orbitRadius: number; 
+  currentAngle: number; 
+  velocity: { x: number; y: number; z: number }; 
   yOffset: number;
   color: string;
   initialScale: { x: number; y: number; z: number };
   timeToLive: number;
   isDissolving: boolean;
-  currentMassFactor?: number; // For stars
-  position?: { x: number; y: number; z: number }; // Current position, updated by canvas
+  currentMassFactor?: number; 
+  position?: { x: number; y: number; z: number }; 
 }
 
 export interface CollisionEvent {
-  id: string; 
+  id: string;
   point: { x: number; y: number; z: number };
   color1: string;
   color2: string;
@@ -53,17 +53,17 @@ const ControlPanelSkeleton = () => (
 );
 
 const HAWKING_RADIATION_THRESHOLD = 3;
-const HAWKING_RADIATION_DURATION = 5000; // ms
-const SPAWNED_OBJECT_BASE_SPEED_MAGNITUDE = 1.0; // Adjusted for initial velocity magnitude
-const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02; // Applied to speed magnitude
-const SPAWNED_OBJECT_SPEED_SCALAR = 1.0; // Scales final initial speed
+const HAWKING_RADIATION_DURATION = 5000; 
+const SPAWNED_OBJECT_BASE_SPEED_MAGNITUDE = 1.0; 
+const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02; 
+const SPAWNED_OBJECT_SPEED_SCALAR = 1.0; 
 const CLOSE_SPAWN_TIME_TO_LIVE = 2.0;
 const CLOSE_SPAWN_RADIUS_FACTOR = 1.3;
 const DISSOLUTION_EFFECT_DURATION = 1.5;
-const COLLISION_DISSOLUTION_DURATION = 1.0; 
+const COLLISION_DISSOLUTION_DURATION = 1.0;
 const STAR_MIN_MASS_FACTOR_BEFORE_DISSOLUTION = 0.1;
-const COLLISION_CHECK_RADIUS_MULTIPLIER_PLANET = 0.8; 
-const COLLISION_CHECK_RADIUS_MULTIPLIER_STAR = 0.8;   
+const COLLISION_CHECK_RADIUS_MULTIPLIER_PLANET = 0.8;
+const COLLISION_CHECK_RADIUS_MULTIPLIER_STAR = 0.8;
 
 
 export default function Home() {
@@ -72,7 +72,7 @@ export default function Home() {
   const [accretionDiskOuterRadius, setAccretionDiskOuterRadius] = useState(3);
   const [accretionDiskOpacity, setAccretionDiskOpacity] = useState(0.8);
   const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 2, z: 5 });
-  const [simulationSpeed, setSimulationSpeed] = useState(1.0); // Start with a more moderate speed for N-body
+  const [simulationSpeed, setSimulationSpeed] = useState(1.0);
 
   const [spawnedObjects, setSpawnedObjects] = useState<PlanetState[]>([]);
   const [nextObjectId, setNextObjectId] = useState(0);
@@ -104,7 +104,7 @@ export default function Home() {
       setAccretionDiskInnerRadius(0);
     }
   };
-  
+
   const handleAccretionDiskOuterRadiusChange = (value: number) => {
     if (value > accretionDiskInnerRadius && value >= 0.1) {
       setAccretionDiskOuterRadius(value);
@@ -132,7 +132,6 @@ export default function Home() {
       objectInitialOrbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
       initialAngle = Math.atan2(clickPosition.z, clickPosition.x);
       yOffset = clickPosition.y;
-      // Ensure object is not spawned directly inside black hole if clicked too close
       if (objectInitialOrbitRadius < blackHoleRadius * 0.98) {
           const normX = clickPosition.x / objectInitialOrbitRadius;
           const normZ = clickPosition.z / objectInitialOrbitRadius;
@@ -149,30 +148,27 @@ export default function Home() {
       initialPosY = yOffset;
       initialPosZ = objectInitialOrbitRadius * Math.sin(initialAngle);
     }
-    
-    objectInitialOrbitRadius = Math.max(objectInitialOrbitRadius, 0.01); 
 
-    // Calculate initial tangential speed for orbit primarily around black hole
-    // (Canvas will refine this with N-body physics)
-    let initialSpeedMagnitude = SPAWNED_OBJECT_BASE_SPEED_MAGNITUDE * Math.pow(Math.max(0.1, blackHoleRadius) / objectInitialOrbitRadius, 0.5); // Simplified v = sqrt(GM/r)
+    objectInitialOrbitRadius = Math.max(objectInitialOrbitRadius, 0.01);
+
+    let initialSpeedMagnitude = SPAWNED_OBJECT_BASE_SPEED_MAGNITUDE * Math.pow(Math.max(0.1, blackHoleRadius) / objectInitialOrbitRadius, 0.5);
     initialSpeedMagnitude = Math.max(initialSpeedMagnitude, SPAWNED_OBJECT_BASE_SPEED_MAGNITUDE * SPAWNED_OBJECT_MIN_SPEED_FACTOR);
-    initialSpeedMagnitude *= SPAWNED_OBJECT_SPEED_SCALAR; 
-    // Removed simulationSpeed multiplication here, it will be handled in canvas physics deltaTime
-    
+    initialSpeedMagnitude *= SPAWNED_OBJECT_SPEED_SCALAR;
+
     const initialVelocity = {
         x: -initialSpeedMagnitude * Math.sin(initialAngle),
-        y: 0, // Assuming initial orbit primarily in XZ plane relative to spawn logic
+        y: 0,
         z: initialSpeedMagnitude * Math.cos(initialAngle)
     };
 
     let color, initialScale, currentMassFactor;
     if (selectedObjectType === 'star') {
       color = '#FFFF99';
-      initialScale = { x: 0.2, y: 0.2, z: 0.2 }; // Base scale for stars
+      initialScale = { x: 0.2, y: 0.2, z: 0.2 };
       currentMassFactor = 1.0;
     } else {
       color = `hsl(${Math.random() * 360}, 70%, 60%)`;
-      initialScale = { x: 0.1, y: 0.1, z: 0.1 }; // Base scale for planets
+      initialScale = { x: 0.1, y: 0.1, z: 0.1 };
       currentMassFactor = undefined;
     }
 
@@ -184,23 +180,23 @@ export default function Home() {
     const newObject: PlanetState = {
       id,
       type: selectedObjectType,
-      orbitRadius: objectInitialOrbitRadius, // For reference, actual orbit will be dynamic
-      currentAngle: initialAngle, // For reference
+      orbitRadius: objectInitialOrbitRadius,
+      currentAngle: initialAngle,
       velocity: initialVelocity,
-      yOffset, // Initial Y position, velocity may change this
+      yOffset,
       color,
       initialScale,
       timeToLive: timeToLive,
       isDissolving: false,
       currentMassFactor,
-      position: { 
+      position: {
         x: initialPosX,
         y: initialPosY,
         z: initialPosZ,
       }
     };
     setSpawnedObjects(prev => [...prev, newObject]);
-  }, [nextObjectId, blackHoleRadius, accretionDiskOuterRadius, accretionDiskInnerRadius, selectedObjectType, simulationSpeed]);
+  }, [nextObjectId, blackHoleRadius, accretionDiskOuterRadius, accretionDiskInnerRadius, selectedObjectType]);
 
   const triggerJetEmission = useCallback(() => {
     if (isEmittingJets) return;
@@ -241,7 +237,7 @@ export default function Home() {
               ...obj,
               currentMassFactor: newMassFactor,
               isDissolving: true,
-              timeToLive: Math.min(obj.timeToLive, DISSOLUTION_EFFECT_DURATION * 1.2) // Stars also dissolve quickly when depleted
+              timeToLive: Math.min(obj.timeToLive, DISSOLUTION_EFFECT_DURATION * 1.2)
             };
           }
           return { ...obj, currentMassFactor: newMassFactor };
@@ -260,7 +256,7 @@ export default function Home() {
     if (activeObjects.length < 2) return;
 
     const newCollisionEvents: CollisionEvent[] = [];
-    const updatedObjects = [...spawnedObjects]; 
+    const updatedObjects = [...spawnedObjects];
     let collisionOccurredThisTick = false;
 
     for (let i = 0; i < activeObjects.length; i++) {
@@ -268,7 +264,7 @@ export default function Home() {
         const obj1 = activeObjects[i];
         const obj2 = activeObjects[j];
 
-        if (!obj1.position || !obj2.position) continue; 
+        if (!obj1.position || !obj2.position) continue;
 
         const pairKey1 = `${obj1.id}-${obj2.id}`;
         const pairKey2 = `${obj2.id}-${obj1.id}`;
@@ -281,16 +277,16 @@ export default function Home() {
         const dz = obj1.position.z - obj2.position.z;
         const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-        const radius1 = obj1.type === 'star' 
+        const radius1 = obj1.type === 'star'
                         ? obj1.initialScale.x * (obj1.currentMassFactor || 1.0) * COLLISION_CHECK_RADIUS_MULTIPLIER_STAR
                         : obj1.initialScale.x * COLLISION_CHECK_RADIUS_MULTIPLIER_PLANET;
         const radius2 = obj2.type === 'star'
                         ? obj2.initialScale.x * (obj2.currentMassFactor || 1.0) * COLLISION_CHECK_RADIUS_MULTIPLIER_STAR
                         : obj2.initialScale.x * COLLISION_CHECK_RADIUS_MULTIPLIER_PLANET;
-        
+
         if (distance < radius1 + radius2) {
           const collisionPoint = {
-            x: obj1.position.x + dx * (radius1 / (radius1 + radius2)), 
+            x: obj1.position.x + dx * (radius1 / (radius1 + radius2)),
             y: obj1.position.y + dy * (radius1 / (radius1 + radius2)),
             z: obj1.position.z + dz * (radius1 / (radius1 + radius2)),
           };
@@ -303,7 +299,7 @@ export default function Home() {
             objectId1: obj1.id,
             objectId2: obj2.id,
           });
-          
+
           recentlyCollidedPairs.current.add(pairKey1);
           recentlyCollidedPairs.current.add(pairKey2);
 
@@ -331,11 +327,11 @@ export default function Home() {
     if (collisionOccurredThisTick) {
       setSpawnedObjects(updatedObjects);
     }
-    
-    const timeoutId = setTimeout(() => recentlyCollidedPairs.current.clear(), 500); 
+
+    const timeoutId = setTimeout(() => recentlyCollidedPairs.current.clear(), 500);
     return () => clearTimeout(timeoutId);
 
-  }, [spawnedObjects]); 
+  }, [spawnedObjects]);
 
   const handleCollisionEventProcessed = useCallback((eventId: string) => {
     setCollisionEvents(prev => prev.filter(event => event.id !== eventId));
@@ -348,9 +344,9 @@ export default function Home() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background relative">
       <div className="absolute top-4 left-4 z-20">
-        <Button 
-          variant="outline" 
-          size="icon" 
+        <Button
+          variant="outline"
+          size="icon"
           className="bg-card/70 backdrop-blur-md text-foreground hover:bg-accent hover:text-accent-foreground"
           onClick={handleManualJetEmission}
           title="Trigger Hawking Radiation Jets"
@@ -367,30 +363,32 @@ export default function Home() {
               <span className="sr-only">Toggle Controls</span>
             </Button>
           </SheetTrigger>
-          <SheetContent 
-            side="right" 
-            className="w-[350px] sm:w-[400px] bg-sidebar/70 backdrop-blur-lg text-sidebar-foreground border-sidebar-border/50 p-0"
+          <SheetContent
+            side="right"
+            className="w-[350px] sm:w-[400px] bg-sidebar/70 backdrop-blur-lg text-sidebar-foreground border-sidebar-border/50 p-0 flex flex-col"
           >
             <SheetHeader className="p-4 border-b border-sidebar-border/50">
               <SheetTitle className="text-xl font-headline text-sidebar-foreground">Simulation Controls</SheetTitle>
             </SheetHeader>
-            <ControlPanel
-              blackHoleRadius={blackHoleRadius}
-              setBlackHoleRadius={handleBlackHoleRadiusChange}
-              accretionDiskInnerRadius={accretionDiskInnerRadius} 
-              setAccretionDiskInnerRadius={handleAccretionDiskInnerRadiusChange}
-              accretionDiskOuterRadius={accretionDiskOuterRadius} 
-              setAccretionDiskOuterRadius={handleAccretionDiskOuterRadiusChange}
-              accretionDiskOpacity={accretionDiskOpacity}
-              setAccretionDiskOpacity={setAccretionDiskOpacity}
-              cameraPosition={cameraPosition}
-              onSpawnObjectClick={() => handleSpawnObject()}
-              selectedObjectType={selectedObjectType}
-              setSelectedObjectType={setSelectedObjectType}
-              onManualJetEmissionClick={handleManualJetEmission}
-              simulationSpeed={simulationSpeed}
-              setSimulationSpeed={setSimulationSpeed}
-            />
+            <div className="flex-1 overflow-y-auto">
+              <ControlPanel
+                blackHoleRadius={blackHoleRadius}
+                setBlackHoleRadius={handleBlackHoleRadiusChange}
+                accretionDiskInnerRadius={accretionDiskInnerRadius}
+                setAccretionDiskInnerRadius={handleAccretionDiskInnerRadiusChange}
+                accretionDiskOuterRadius={accretionDiskOuterRadius}
+                setAccretionDiskOuterRadius={handleAccretionDiskOuterRadiusChange}
+                accretionDiskOpacity={accretionDiskOpacity}
+                setAccretionDiskOpacity={setAccretionDiskOpacity}
+                cameraPosition={cameraPosition}
+                onSpawnObjectClick={() => handleSpawnObject()}
+                selectedObjectType={selectedObjectType}
+                setSelectedObjectType={setSelectedObjectType}
+                onManualJetEmissionClick={handleManualJetEmission}
+                simulationSpeed={simulationSpeed}
+                setSimulationSpeed={setSimulationSpeed}
+              />
+            </div>
           </SheetContent>
         </Sheet>
       </div>
