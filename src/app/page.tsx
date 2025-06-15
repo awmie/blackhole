@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, Suspense, useCallback, useEffect } from 'react';
+import React, { useState, Suspense, useCallback, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import type * as THREE from 'three';
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,16 @@ export interface PlanetState {
   timeToLive: number;
   isDissolving: boolean;
   currentMassFactor?: number;
+  position?: { x: number; y: number; z: number }; // Added for collision detection
+}
+
+export interface CollisionEvent {
+  id: string; // Unique ID for the event
+  point: { x: number; y: number; z: number };
+  color1: string;
+  color2: string;
+  objectId1: number;
+  objectId2: number;
 }
 
 const ThreeBlackholeCanvas = React.lazy(() => import('@/components/event-horizon/three-blackhole-canvas'));
@@ -50,7 +60,10 @@ const SPAWNED_OBJECT_SPEED_SCALAR = 1.0;
 const CLOSE_SPAWN_TIME_TO_LIVE = 2.0;
 const CLOSE_SPAWN_RADIUS_FACTOR = 1.3;
 const DISSOLUTION_EFFECT_DURATION = 1.5;
+const COLLISION_DISSOLUTION_DURATION = 1.0; // Objects shatter and get absorbed quickly
 const STAR_MIN_MASS_FACTOR_BEFORE_DISSOLUTION = 0.1;
+const COLLISION_CHECK_RADIUS_MULTIPLIER_PLANET = 0.8; // Adjust for tighter collision box
+const COLLISION_CHECK_RADIUS_MULTIPLIER_STAR = 0.8;   // Adjust for tighter collision box
 
 
 export default function Home() {
@@ -68,8 +81,10 @@ export default function Home() {
   const [showControlsPanel, setShowControlsPanel] = useState(false);
 
   const [selectedObjectType, setSelectedObjectType] = useState<'planet' | 'star'>('planet');
+  const [simulationCamera, setSimulationCamera] = useState<THREE.PerspectiveCamera | null>(null);
 
-  const [, setSimulationCamera] = useState<THREE.PerspectiveCamera | null>(null);
+  const [collisionEvents, setCollisionEvents] = useState<CollisionEvent[]>([]);
+  const recentlyCollidedPairs = useRef<Set<string>>(new Set());
 
 
   const handleCameraUpdate = useCallback((position: { x: number; y: number; z: number }) => {
@@ -112,7 +127,7 @@ export default function Home() {
       objectOrbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
       currentAngle = Math.atan2(clickPosition.z, clickPosition.x);
       yOffset = clickPosition.y;
-      objectOrbitRadius = Math.max(objectOrbitRadius, blackHoleRadius * 0.98); // Ensures very close spawns trigger dissolution
+      objectOrbitRadius = Math.max(objectOrbitRadius, blackHoleRadius * 0.98); 
     } else {
       objectOrbitRadius = accretionDiskInnerRadius + (accretionDiskOuterRadius - accretionDiskInnerRadius) * (0.2 + Math.random() * 0.8);
       currentAngle = Math.random() * Math.PI * 2;
@@ -153,6 +168,11 @@ export default function Home() {
       timeToLive: timeToLive,
       isDissolving: false,
       currentMassFactor,
+      position: { // Initial rough position, canvas will update accurately
+        x: objectOrbitRadius * Math.cos(currentAngle),
+        y: yOffset,
+        z: objectOrbitRadius * Math.sin(currentAngle),
+      }
     };
     setSpawnedObjects(prev => [...prev, newObject]);
   }, [nextObjectId, blackHoleRadius, accretionDiskOuterRadius, accretionDiskInnerRadius, selectedObjectType, simulationSpeed]);
@@ -177,7 +197,6 @@ export default function Home() {
   const handleManualJetEmission = useCallback(() => {
     triggerJetEmission();
   }, [triggerJetEmission]);
-
 
   const handleSetPlanetDissolving = useCallback((objectId: number, dissolving: boolean) => {
     setSpawnedObjects(prevObjects =>
@@ -205,6 +224,102 @@ export default function Home() {
         return obj;
       })
     );
+  }, []);
+
+  const handleUpdatePlanetPosition = useCallback((objectId: number, position: {x:number, y:number, z:number}) => {
+    setSpawnedObjects(prev => prev.map(obj => obj.id === objectId ? {...obj, position} : obj));
+  }, []);
+
+  useEffect(() => {
+    // Collision detection logic
+    const activeObjects = spawnedObjects.filter(obj => !obj.isDissolving);
+    if (activeObjects.length < 2) return;
+
+    const newCollisionEvents: CollisionEvent[] = [];
+    const updatedObjects = [...spawnedObjects]; // Create a mutable copy
+    let collisionOccurredThisTick = false;
+
+    for (let i = 0; i < activeObjects.length; i++) {
+      for (let j = i + 1; j < activeObjects.length; j++) {
+        const obj1 = activeObjects[i];
+        const obj2 = activeObjects[j];
+
+        if (!obj1.position || !obj2.position) continue; // Position not updated yet
+
+        const pairKey1 = `${obj1.id}-${obj2.id}`;
+        const pairKey2 = `${obj2.id}-${obj1.id}`;
+        if (recentlyCollidedPairs.current.has(pairKey1) || recentlyCollidedPairs.current.has(pairKey2)) {
+            continue;
+        }
+
+        const dx = obj1.position.x - obj2.position.x;
+        const dy = obj1.position.y - obj2.position.y;
+        const dz = obj1.position.z - obj2.position.z;
+        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        const radius1 = obj1.type === 'star' 
+                        ? obj1.initialScale.x * (obj1.currentMassFactor || 1.0) * COLLISION_CHECK_RADIUS_MULTIPLIER_STAR
+                        : obj1.initialScale.x * COLLISION_CHECK_RADIUS_MULTIPLIER_PLANET;
+        const radius2 = obj2.type === 'star'
+                        ? obj2.initialScale.x * (obj2.currentMassFactor || 1.0) * COLLISION_CHECK_RADIUS_MULTIPLIER_STAR
+                        : obj2.initialScale.x * COLLISION_CHECK_RADIUS_MULTIPLIER_PLANET;
+        
+        if (distance < radius1 + radius2) {
+          // Collision detected
+          const collisionPoint = {
+            x: obj1.position.x + dx * (radius1 / (radius1 + radius2)), // Midpoint weighted by radius, roughly
+            y: obj1.position.y + dy * (radius1 / (radius1 + radius2)),
+            z: obj1.position.z + dz * (radius1 / (radius1 + radius2)),
+          };
+
+          newCollisionEvents.push({
+            id: `${Date.now()}-${obj1.id}-${obj2.id}`,
+            point: collisionPoint,
+            color1: obj1.color,
+            color2: obj2.color,
+            objectId1: obj1.id,
+            objectId2: obj2.id,
+          });
+          
+          recentlyCollidedPairs.current.add(pairKey1);
+          recentlyCollidedPairs.current.add(pairKey2);
+
+          const markAsColliding = (id: number) => {
+            const index = updatedObjects.findIndex(obj => obj.id === id);
+            if (index !== -1 && !updatedObjects[index].isDissolving) {
+              updatedObjects[index] = {
+                ...updatedObjects[index],
+                isDissolving: true,
+                timeToLive: COLLISION_DISSOLUTION_DURATION,
+              };
+              collisionOccurredThisTick = true;
+            }
+          };
+
+          markAsColliding(obj1.id);
+          markAsColliding(obj2.id);
+        }
+      }
+    }
+
+    if (newCollisionEvents.length > 0) {
+      setCollisionEvents(prev => [...prev, ...newCollisionEvents]);
+    }
+    if (collisionOccurredThisTick) {
+      setSpawnedObjects(updatedObjects);
+    }
+    // Clear recentlyCollidedPairs for next frame/tick if needed, or manage its size
+    // For now, this simple set might grow. A better approach for persistent recentlyCollidedPairs
+    // would involve removing them after the objects are fully absorbed.
+    // For simplicity here, let's clear it periodically or when objects are absorbed.
+    // This effect ensures a pair doesn't continually trigger if logic runs fast.
+    const timeoutId = setTimeout(() => recentlyCollidedPairs.current.clear(), 500); // Clear after a short delay
+    return () => clearTimeout(timeoutId);
+
+  }, [spawnedObjects, simulationSpeed]); // simulationSpeed ensures re-check if dynamics change
+
+  const handleCollisionEventProcessed = useCallback((eventId: string) => {
+    setCollisionEvents(prev => prev.filter(event => event.id !== eventId));
   }, []);
 
 
@@ -270,9 +385,13 @@ export default function Home() {
             onCameraReady={setSimulationCamera}
             onShiftClickSpawnAtPoint={handleSpawnObject}
             onStarMassLoss={handleStarMassLoss}
+            onUpdatePlanetPosition={handleUpdatePlanetPosition}
+            collisionEvents={collisionEvents}
+            onCollisionEventProcessed={handleCollisionEventProcessed}
           />
         </Suspense>
       </div>
     </div>
   );
 }
+
