@@ -939,11 +939,11 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                         activeJets = true;
                         const direction = Math.random() > 0.5 ? 1 : -1;
                         jetP.position.set(0, direction * blackHoleRadiusRef_anim.current * 1.05, 0);
-                        const spreadAngle = Math.PI / 24; // Made thinner
+                        const spreadAngle = Math.PI / 48; 
                         const coneAngle = Math.random() * Math.PI * 2; 
                         const elevationAngle = (Math.random() * spreadAngle) - (spreadAngle / 2); 
                         let velDir = new THREE_ANIM.Vector3(Math.sin(elevationAngle) * Math.cos(coneAngle), Math.cos(elevationAngle) * direction, Math.sin(elevationAngle) * Math.sin(coneAngle));
-                        const randomOffset = new THREE_ANIM.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(0.05); // Reduced offset
+                        const randomOffset = new THREE_ANIM.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(0.025); 
                         velDir.add(randomOffset);
                         jetP.velocity.copy(velDir.normalize().multiplyScalar(JET_SPEED * (0.7 + Math.random() * 0.6))); 
                         jetP.life = 1.0; 
@@ -1282,3 +1282,4 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
     
+
