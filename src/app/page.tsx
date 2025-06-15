@@ -336,7 +336,7 @@ export default function Home() {
         <Button 
           variant="outline" 
           size="icon" 
-          className="bg-card/80 backdrop-blur-sm text-foreground hover:bg-accent hover:text-accent-foreground"
+          className="bg-card/70 backdrop-blur-md text-foreground hover:bg-accent hover:text-accent-foreground"
           onClick={handleManualJetEmission}
           title="Trigger Hawking Radiation Jets"
         >
@@ -347,14 +347,14 @@ export default function Home() {
       <div className="absolute top-4 right-4 z-20">
         <Sheet open={showControlsPanel} onOpenChange={setShowControlsPanel}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="bg-card/80 backdrop-blur-sm text-foreground hover:bg-accent hover:text-accent-foreground">
+            <Button variant="outline" size="icon" className="bg-card/70 backdrop-blur-md text-foreground hover:bg-accent hover:text-accent-foreground">
               <Info className="h-5 w-5" />
               <span className="sr-only">Toggle Controls</span>
             </Button>
           </SheetTrigger>
           <SheetContent 
             side="right" 
-            className="w-[350px] sm:w-[400px] bg-sidebar/80 backdrop-blur-md text-sidebar-foreground border-sidebar-border/50 p-0"
+            className="w-[350px] sm:w-[400px] bg-sidebar/70 backdrop-blur-lg text-sidebar-foreground border-sidebar-border/50 p-0"
           >
             <SheetHeader className="p-4 border-b border-sidebar-border/50">
               <SheetTitle className="text-xl font-headline text-sidebar-foreground">Simulation Controls</SheetTitle>
