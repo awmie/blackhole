@@ -93,25 +93,27 @@ export default function Home() {
 
   const handleBlackHoleRadiusChange = (value: number) => {
     setBlackHoleRadius(value);
-    // Accretion disk radii are now independent of black hole radius changes for their minimums.
-    // The visual occlusion is handled by Three.js rendering.
+    // Accretion disk radii state (controlled by sliders) are independent.
+    // The actual radii passed to the canvas for particle generation will be clamped.
   };
 
   const handleAccretionDiskInnerRadiusChange = (value: number) => {
     if (value >= 0 && value < accretionDiskOuterRadius) {
       setAccretionDiskInnerRadius(value);
     } else if (value >= accretionDiskOuterRadius) {
-      // Prevent inner radius from exceeding or equaling outer radius
       setAccretionDiskInnerRadius(Math.max(0, accretionDiskOuterRadius - 0.1));
+    } else if (value < 0) {
+      setAccretionDiskInnerRadius(0);
     }
   };
-
+  
   const handleAccretionDiskOuterRadiusChange = (value: number) => {
-    if (value > accretionDiskInnerRadius && value >= 0.1) { // Ensure outer is greater and has a minimal sensible size
+    if (value > accretionDiskInnerRadius && value >= 0.1) {
       setAccretionDiskOuterRadius(value);
     } else if (value <= accretionDiskInnerRadius) {
-       // Prevent outer radius from being less than or equal to inner radius
       setAccretionDiskOuterRadius(accretionDiskInnerRadius + 0.1);
+    } else if (value < 0.1) {
+      setAccretionDiskOuterRadius(Math.max(0.1, accretionDiskInnerRadius + 0.1));
     }
   };
 
@@ -121,7 +123,11 @@ export default function Home() {
 
     let objectOrbitRadius, currentAngle, yOffset;
 
-    const effectiveInnerRadius = Math.max(accretionDiskInnerRadius, blackHoleRadius * 0.5); // Ensure spawning happens in a visible/active region for calculation
+    // For spawning, use an effective inner radius that considers the black hole's actual size
+    // to prevent spawning objects directly inside it by default.
+    const diskEffectiveInnerRadiusForSpawning = Math.max(accretionDiskInnerRadius, blackHoleRadius);
+    const diskEffectiveOuterRadiusForSpawning = Math.max(accretionDiskOuterRadius, diskEffectiveInnerRadiusForSpawning + 0.2);
+
 
     if (clickPosition) {
       objectOrbitRadius = Math.sqrt(clickPosition.x * clickPosition.x + clickPosition.z * clickPosition.z);
@@ -129,14 +135,15 @@ export default function Home() {
       yOffset = clickPosition.y;
       objectOrbitRadius = Math.max(objectOrbitRadius, blackHoleRadius * 0.98); 
     } else {
-      objectOrbitRadius = effectiveInnerRadius + (accretionDiskOuterRadius - effectiveInnerRadius) * (0.2 + Math.random() * 0.8);
+      // Ensure spawning happens in a sensible range based on the *visible* disk
+      objectOrbitRadius = diskEffectiveInnerRadiusForSpawning + (diskEffectiveOuterRadiusForSpawning - diskEffectiveInnerRadiusForSpawning) * (0.2 + Math.random() * 0.8);
       currentAngle = Math.random() * Math.PI * 2;
       yOffset = (Math.random() - 0.5) * 0.1;
     }
     
-    objectOrbitRadius = Math.max(objectOrbitRadius, 0.01); // Ensure orbit radius is not zero
+    objectOrbitRadius = Math.max(objectOrbitRadius, 0.01); 
 
-    let angularVelocity = SPAWNED_OBJECT_BASE_SPEED * Math.pow(Math.max(0.1, effectiveInnerRadius) / objectOrbitRadius, 2.5);
+    let angularVelocity = SPAWNED_OBJECT_BASE_SPEED * Math.pow(Math.max(0.1, diskEffectiveInnerRadiusForSpawning) / objectOrbitRadius, 2.5);
     angularVelocity = Math.max(angularVelocity, SPAWNED_OBJECT_BASE_SPEED * SPAWNED_OBJECT_MIN_SPEED_FACTOR);
     angularVelocity *= SPAWNED_OBJECT_SPEED_SCALAR * simulationSpeed; 
     angularVelocity = Math.abs(angularVelocity);
@@ -318,6 +325,10 @@ export default function Home() {
     setCollisionEvents(prev => prev.filter(event => event.id !== eventId));
   }, []);
 
+  // Calculate effective radii for the ThreeBlackholeCanvas
+  const effectiveCanvasInnerRadius = Math.max(accretionDiskInnerRadius, blackHoleRadius);
+  const effectiveCanvasOuterRadius = Math.max(accretionDiskOuterRadius, effectiveCanvasInnerRadius + 0.1);
+
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background relative">
@@ -351,9 +362,9 @@ export default function Home() {
             <ControlPanel
               blackHoleRadius={blackHoleRadius}
               setBlackHoleRadius={handleBlackHoleRadiusChange}
-              accretionDiskInnerRadius={accretionDiskInnerRadius}
+              accretionDiskInnerRadius={accretionDiskInnerRadius} // Pass raw slider value
               setAccretionDiskInnerRadius={handleAccretionDiskInnerRadiusChange}
-              accretionDiskOuterRadius={accretionDiskOuterRadius}
+              accretionDiskOuterRadius={accretionDiskOuterRadius} // Pass raw slider value
               setAccretionDiskOuterRadius={handleAccretionDiskOuterRadiusChange}
               accretionDiskOpacity={accretionDiskOpacity}
               setAccretionDiskOpacity={setAccretionDiskOpacity}
@@ -373,8 +384,8 @@ export default function Home() {
         <Suspense fallback={<Skeleton className="w-full h-full bg-muted-foreground/20 rounded-none" />}>
           <ThreeBlackholeCanvas
             blackHoleRadius={blackHoleRadius}
-            accretionDiskInnerRadius={accretionDiskInnerRadius}
-            accretionDiskOuterRadius={accretionDiskOuterRadius}
+            accretionDiskInnerRadius={effectiveCanvasInnerRadius}
+            accretionDiskOuterRadius={effectiveCanvasOuterRadius}
             accretionDiskOpacity={accretionDiskOpacity}
             onCameraUpdate={handleCameraUpdate}
             spawnedPlanets={spawnedObjects}
