@@ -151,11 +151,10 @@ void main() {
   float noiseVal1 = fbm(noiseCoordBase1);
   float noiseVal2 = fbm(noiseCoordBase2 * 1.4 + vec2(sin(timeFactor*0.12), cos(timeFactor*0.12)) * 0.6);
 
-  float combinedNoise = (noiseVal1 * 0.6 + noiseVal2 * 0.4); 
-  combinedNoise = smoothstep(0.3, 0.7, combinedNoise); 
+  float rawNoise = (noiseVal1 * 0.6 + noiseVal2 * 0.4);
+  float noiseModulation = 0.6 + rawNoise * 0.4; // Modulate noise influence to be between 0.6 and 1.0
+  float effectIntensity = fresnel * noiseModulation * 1.5; // Boosted intensity, less likely to be 0 from noise
   
-  float effectIntensity = fresnel * combinedNoise * 2.0;
-
   vec4 bhCenterClip = projectionMatrix * viewMatrix * u_bhModelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
   vec2 bhCenterNDC = bhCenterClip.xy / bhCenterClip.w;
   vec2 bhCenterScreenUV = bhCenterNDC * 0.5 + 0.5;
@@ -211,12 +210,8 @@ const STAR_DISSOLUTION_PARTICLE_LIFESPAN = 1.5;
 const STAR_DISSOLUTION_PARTICLE_INITIAL_SPEED = 0.3;
 const STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR = 0.5;
 
-const STAR_LIGHT_PARTICLE_LIFESPAN = 2.0; 
-const STAR_LIGHT_PARTICLE_INITIAL_SPEED = 0.05;
-const STAR_LIGHT_PARTICLE_GRAVITY_FACTOR = 0.02;
-const STAR_LIGHT_PARTICLE_SIZE = 0.00015; 
-const STAR_CONTINUOUS_MASS_LOSS_RATE_PER_SECOND = 0.005; 
-const STAR_LIGHT_EMISSION_PROXIMITY_FACTOR = 1.8; 
+// STAR_LIGHT_PARTICLE related constants are no longer used for continuous trails
+// They are effectively replaced by STAR_DISSOLUTION logic for particle emission during absorption
 
 const SHATTER_PARTICLE_POOL_SIZE = 5000;
 const SHATTER_PARTICLES_PER_COLLISION = 75;
@@ -651,7 +646,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
     controls.minDistance = blackHoleRadiusRef_anim.current * 1.2;
-    controls.maxDistance = 80; // Updated maxDistance
+    controls.maxDistance = 80; 
     controlsRef.current = controls;
 
     controls.addEventListener('change', () => {
@@ -669,7 +664,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         u_cameraPosition: { value: camera.position },
         u_starfieldTexture: { value: sceneCaptureRenderTargetRef.current?.texture || null }, 
         u_resolution: { value: new THREE.Vector2(mountRef.current.clientWidth, mountRef.current.clientHeight) },
-        u_lensingStrength: { value: 0.06 }, 
+        u_lensingStrength: { value: 0.12 }, 
         u_bhModelMatrix: { value: new THREE.Matrix4() },
       },
     });
@@ -868,7 +863,8 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
                 hasActiveStarParticles = true;
                 const forceDirection = new THREE_ANIM.Vector3().subVectors(new THREE_ANIM.Vector3(0,0,0), p.position);
                 const distanceSq = Math.max(0.1, p.position.lengthSq());
-                const gravityFactor = (p.initialLife === STAR_LIGHT_PARTICLE_LIFESPAN) ? STAR_LIGHT_PARTICLE_GRAVITY_FACTOR : STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR;
+                // Gravity factor depends on whether it's a dissolution particle or a (removed) light trail particle
+                const gravityFactor = STAR_DISSOLUTION_PARTICLE_GRAVITY_FACTOR;
                 forceDirection.normalize().multiplyScalar(gravityFactor / distanceSq);
                 p.velocity.addScaledVector(forceDirection, deltaTime);
                 p.position.addScaledVector(p.velocity, deltaTime);
