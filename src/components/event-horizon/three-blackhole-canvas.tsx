@@ -200,7 +200,7 @@ void main() {
 const JET_PARTICLE_COUNT = 10000; 
 const JET_LIFESPAN = 4.0; 
 const JET_SPEED = 6;
-const JET_PARTICLE_BASE_SIZE = 0.00005; 
+const JET_PARTICLE_BASE_SIZE = 0.01; 
 const JET_SPREAD_ANGLE = Math.PI / 262144; 
 const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0000025; 
 const JET_EMIT_BURST_COUNT = 100; 
@@ -844,8 +844,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             }
             currentPlanetOrbitRadius -= effectiveOrbitalDecayRate * blackHoleActualRadius * deltaTime;
             
-            // Removed continuous star light emission from here
-
             if (currentPositionVec.length() < blackHoleActualRadius * DISSOLUTION_START_RADIUS_FACTOR && onSetPlanetDissolvingRef.current) {
                  onSetPlanetDissolvingRef.current(planetProp.id, true);
             } else if (currentPlanetTimeToLive <= 0 || currentPositionVec.length() < blackHoleActualRadius * 0.1) {
@@ -1006,10 +1004,6 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
             onCollisionEventProcessedRef.current(event.id);
           }
         });
-        // Clear processed events from the ref. This might need adjustment based on how events are managed in page.tsx
-        // For now, assuming page.tsx clears its state, and this ref is just a copy for the frame.
-        // If not, this line should be: collisionEventsRef.current = collisionEventsRef.current.filter(e => !processed_event_ids.has(e.id));
-        // Or better, rely on the parent to filter the prop. Here, we'll just process what's given.
       }
       
       // Update shatter particles
