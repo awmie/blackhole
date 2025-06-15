@@ -52,8 +52,10 @@ const ControlPanelSkeleton = () => (
   </div>
 );
 
-const HAWKING_RADIATION_THRESHOLD = 3;
 const HAWKING_RADIATION_DURATION = 5000; 
+const STAR_ABSORPTION_JET_TRIGGER_COUNT = 7;
+const PLANET_ABSORPTION_JET_TRIGGER_COUNT = 12;
+
 const SPAWNED_OBJECT_BASE_SPEED_MAGNITUDE = 1.0; 
 const SPAWNED_OBJECT_MIN_SPEED_FACTOR = 0.02; 
 const SPAWNED_OBJECT_SPEED_SCALAR = 1.0; 
@@ -76,7 +78,10 @@ export default function Home() {
 
   const [spawnedObjects, setSpawnedObjects] = useState<PlanetState[]>([]);
   const [nextObjectId, setNextObjectId] = useState(0);
-  const [absorbedObjectCount, setAbsorbedObjectCount] = useState(0);
+  
+  const [absorbedStarCountSinceLastJet, setAbsorbedStarCountSinceLastJet] = useState(0);
+  const [absorbedPlanetCountSinceLastJet, setAbsorbedPlanetCountSinceLastJet] = useState(0);
+
   const [isEmittingJets, setIsEmittingJets] = useState(false);
   const [showControlsPanel, setShowControlsPanel] = useState(false);
 
@@ -201,19 +206,36 @@ export default function Home() {
   const triggerJetEmission = useCallback(() => {
     if (isEmittingJets) return;
     setIsEmittingJets(true);
+    setAbsorbedStarCountSinceLastJet(0);
+    setAbsorbedPlanetCountSinceLastJet(0);
     setTimeout(() => setIsEmittingJets(false), HAWKING_RADIATION_DURATION);
   }, [isEmittingJets]);
 
   const handleAbsorbObject = useCallback((objectId: number) => {
-    setSpawnedObjects(prev => prev.filter(p => p.id !== objectId));
-    setAbsorbedObjectCount(prev => {
-      const newCount = prev + 1;
-      if (newCount % HAWKING_RADIATION_THRESHOLD === 0 && newCount > 0) {
+    const objectToAbsorb = spawnedObjects.find(obj => obj.id === objectId);
+
+    if (objectToAbsorb) {
+      let shouldTriggerJet = false;
+      if (objectToAbsorb.type === 'star') {
+        const newStarCount = absorbedStarCountSinceLastJet + 1;
+        setAbsorbedStarCountSinceLastJet(newStarCount);
+        if (newStarCount >= STAR_ABSORPTION_JET_TRIGGER_COUNT) {
+          shouldTriggerJet = true;
+        }
+      } else if (objectToAbsorb.type === 'planet') {
+        const newPlanetCount = absorbedPlanetCountSinceLastJet + 1;
+        setAbsorbedPlanetCountSinceLastJet(newPlanetCount);
+        if (newPlanetCount >= PLANET_ABSORPTION_JET_TRIGGER_COUNT) {
+          shouldTriggerJet = true;
+        }
+      }
+      if (shouldTriggerJet) {
         triggerJetEmission();
       }
-      return newCount;
-    });
-  }, [triggerJetEmission]);
+    }
+    setSpawnedObjects(prev => prev.filter(p => p.id !== objectId));
+  }, [spawnedObjects, triggerJetEmission, absorbedStarCountSinceLastJet, absorbedPlanetCountSinceLastJet]);
+
 
   const handleManualJetEmission = useCallback(() => {
     triggerJetEmission();
@@ -387,6 +409,8 @@ export default function Home() {
                 onManualJetEmissionClick={handleManualJetEmission}
                 simulationSpeed={simulationSpeed}
                 setSimulationSpeed={setSimulationSpeed}
+                starAbsorptionJetTriggerCount={STAR_ABSORPTION_JET_TRIGGER_COUNT}
+                planetAbsorptionJetTriggerCount={PLANET_ABSORPTION_JET_TRIGGER_COUNT}
               />
             </div>
           </SheetContent>

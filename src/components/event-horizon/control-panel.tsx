@@ -6,7 +6,6 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-// ScrollArea is removed as scrolling is handled by SheetContent's wrapper
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sun, PanelLeftClose, PanelRightClose, Layers, Ruler, Move3d, Database, Atom, Zap, Gauge } from 'lucide-react';
@@ -27,6 +26,8 @@ interface ControlPanelProps {
   onManualJetEmissionClick: () => void;
   simulationSpeed: number;
   setSimulationSpeed: (value: number) => void;
+  starAbsorptionJetTriggerCount: number;
+  planetAbsorptionJetTriggerCount: number;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -45,11 +46,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onManualJetEmissionClick,
   simulationSpeed,
   setSimulationSpeed,
+  starAbsorptionJetTriggerCount,
+  planetAbsorptionJetTriggerCount,
 }) => {
   const calculatedSchwarzschildRadius = (blackHoleRadius * 0.25).toFixed(2);
 
   return (
-    // Removed ScrollArea component
     <div className="p-4 space-y-6">
       <Card className="bg-sidebar/70 text-sidebar-foreground border-sidebar-border/50 shadow-lg">
         <CardHeader>
@@ -149,7 +151,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
            <Button onClick={onManualJetEmissionClick} variant="outline" className="w-full">
             <Zap className="mr-2 h-4 w-4" /> Trigger Hawking Jet (Panel)
           </Button>
-          <p className="text-xs text-muted-foreground text-center">Shift-click on canvas to spawn at cursor. After {3} absorptions, Hawking radiation jets might appear briefly.</p>
+          <p className="text-xs text-muted-foreground text-center">
+            Shift-click on canvas to spawn at cursor. After absorbing {starAbsorptionJetTriggerCount} stars OR {planetAbsorptionJetTriggerCount} planets, Hawking radiation jets might appear.
+          </p>
         </CardContent>
       </Card>
 
@@ -199,3 +203,4 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 };
 
 export default ControlPanel;
+
