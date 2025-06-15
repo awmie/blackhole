@@ -200,9 +200,9 @@ void main() {
 const JET_PARTICLE_COUNT = 2000;
 const JET_LIFESPAN = 2.5; 
 const JET_SPEED = 6; 
-const JET_PARTICLE_BASE_SIZE = 0.0002; // Drastically reduced
-const JET_SPREAD_ANGLE = Math.PI / 65536; // Very narrow
-const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.00001; // Very coherent
+const JET_PARTICLE_BASE_SIZE = 0.0002;
+const JET_SPREAD_ANGLE = Math.PI / 262144; // Extremely narrow
+const JET_VELOCITY_RANDOM_OFFSET_MAGNITUDE = 0.0000025; // Extremely coherent
 
 
 const STAR_EMITTED_PARTICLE_COUNT = 10000;
@@ -1267,4 +1267,3 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
 
 export default ThreeBlackholeCanvas;
     
-
