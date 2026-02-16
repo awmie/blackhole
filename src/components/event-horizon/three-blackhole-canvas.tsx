@@ -176,19 +176,20 @@ void main() {
   vec2 normalizedDirFromCenter = normalize(dirFromCenterToFrag); 
   
   vec2 tangentDir = vec2(-normalizedDirFromCenter.y, normalizedDirFromCenter.x); 
-  float swirlFactor = 0.1; 
+  float swirlFactor = 0.6; 
   
   float swirlPowerFalloff = smoothstep(0.0, 0.3, distFragToCenterScreen); 
   swirlFactor *= swirlPowerFalloff;
 
   vec2 swirledDir = normalize(normalizedDirFromCenter + tangentDir * swirlFactor);
 
-  float lensAmount = u_lensingStrength / (distFragToCenterScreen + 0.001); 
+  float centerFalloff = smoothstep(0.0, 0.05, distFragToCenterScreen); 
+  float lensAmount = u_lensingStrength / (distFragToCenterScreen + 0.001) * centerFalloff;
 
   vec2 offsetVectorScreen = swirledDir * lensAmount;
   offsetVectorScreen.x /= aspectRatio; 
 
-  vec2 sampleUV = fragScreenUV - offsetVectorScreen; // Flipped sign
+  vec2 sampleUV = fragScreenUV + offsetVectorScreen;
   sampleUV = clamp(sampleUV, 0.0, 1.0);
 
   vec3 lensedSceneColor = texture2D(u_starfieldTexture, sampleUV).rgb;
@@ -692,7 +693,7 @@ const ThreeBlackholeCanvas: React.FC<ThreeBlackholeCanvasProps> = ({
         u_cameraPosition: { value: camera.position },
         u_starfieldTexture: { value: sceneCaptureRenderTargetRef.current?.texture || null }, 
         u_resolution: { value: new THREE.Vector2(mountRef.current.clientWidth, mountRef.current.clientHeight) },
-        u_lensingStrength: { value: 0.1 }, // Adjusted default lensing strength
+        u_lensingStrength: { value: 0.12 }, 
         u_bhModelMatrix: { value: new THREE.Matrix4() },
       },
     });
