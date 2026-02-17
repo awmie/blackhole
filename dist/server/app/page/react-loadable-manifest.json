@@ -1,0 +1,10 @@
+{
+  "[project]/src/components/event-horizon/control-panel.tsx [app-client] (ecmascript, next/dynamic entry)": {
+    "id": "[project]/src/components/event-horizon/control-panel.tsx [app-client] (ecmascript, next/dynamic entry)",
+    "files": [
+      "static/chunks/node_modules_39dcd65d._.js",
+      "static/chunks/src_components_1d562410._.js",
+      "static/chunks/src_components_event-horizon_control-panel_tsx_996b21a9._.js"
+    ]
+  }
+}

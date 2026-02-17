@@ -7,8 +7,8 @@ import type * as THREE from 'three';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Info, Zap } from 'lucide-react';
-import { GithubIcon } from '@/components/icons/github-icon';
+import { Info, Lightning } from '@phosphor-icons/react';
+import { GithubLogo } from '@phosphor-icons/react';
 
 
 export interface PlanetState {
@@ -70,9 +70,9 @@ const COLLISION_CHECK_RADIUS_MULTIPLIER_STAR = 0.8;
 
 
 export default function Home() {
-  const [blackHoleRadius, setBlackHoleRadius] = useState(1);
-  const [accretionDiskInnerRadius, setAccretionDiskInnerRadius] = useState(0);
-  const [accretionDiskOuterRadius, setAccretionDiskOuterRadius] = useState(3);
+  const [blackHoleRadius, setBlackHoleRadius] = useState(0.30);
+  const [accretionDiskInnerRadius, setAccretionDiskInnerRadius] = useState(0.90);
+  const [accretionDiskOuterRadius, setAccretionDiskOuterRadius] = useState(2.0);
   const [accretionDiskOpacity, setAccretionDiskOpacity] = useState(0.8);
   const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 2, z: 5 });
   const [simulationSpeed, setSimulationSpeed] = useState(1.0);
@@ -374,7 +374,7 @@ export default function Home() {
           onClick={handleManualJetEmission}
           title="Trigger Hawking Radiation Jets"
         >
-          <Zap className="h-5 w-5" />
+          <Lightning className="h-5 w-5" weight="fill" />
           <span className="sr-only">Trigger Jets</span>
         </Button>
       </div>
@@ -382,7 +382,7 @@ export default function Home() {
         <Sheet open={showControlsPanel} onOpenChange={setShowControlsPanel}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="bg-card/70 backdrop-blur-md text-foreground hover:bg-accent hover:text-accent-foreground">
-              <Info className="h-5 w-5" />
+              <Info className="h-5 w-5" weight="fill" />
               <span className="sr-only">Toggle Controls</span>
             </Button>
           </SheetTrigger>
@@ -426,7 +426,7 @@ export default function Home() {
           className="inline-flex items-center justify-center h-10 w-10 rounded-md border border-input bg-card/70 backdrop-blur-md text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           title="View on GitHub"
         >
-          <GithubIcon className="h-5 w-5" />
+          <GithubLogo className="h-5 w-5" weight="fill" />
           <span className="sr-only">View on GitHub</span>
         </a>
       </div>
