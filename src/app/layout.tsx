@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Event Horizon Visualizer',
+  title: 'Blackhole',
   description: 'Interactive black hole simulation using Three.js and Next.js',
   icons: {
     icon: '/favicon.svg',
