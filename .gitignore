@@ -19,6 +19,7 @@
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -77,4 +78,4 @@ pids
 *.tgz
 
 # Yarn Integrity file
-.yarn-integrity
+.yarn-integrity 
